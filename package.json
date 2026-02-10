@@ -3,7 +3,7 @@
     "title": "QualityTrade PR Creator",
     "description": "Create PRs with JIRA integration and multi-target support",
     "icon": "icon.png",
-    "author": "raycast",
+    "author": "Jian Raphael R. Cudiamat",
     "license": "MIT",
     "commands": [
         {
