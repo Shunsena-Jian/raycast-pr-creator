@@ -1,6 +1,7 @@
 import re
+from typing import List, Tuple
 
-def parse_branch_name(branch: str):
+def parse_branch_name(branch: str) -> Tuple[List[str], str]:
     """
     Extract JIRA tickets and a readable title from branch name.
     e.g. feature/PROJ-123-PROJ-456-some-fix -> (['PROJ-123', 'PROJ-456'], 'Some Fix')

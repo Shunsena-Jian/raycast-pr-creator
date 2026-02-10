@@ -8,42 +8,55 @@ export interface GitData {
   contributors: string[];
   suggestedTickets: string[];
   suggestedTitle: string;
+  error?: string;
 }
 
 export function useGitData(repoPath?: string) {
   const [data, setData] = useState<GitData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let isMounted = true;
+
     async function fetchData() {
       if (!repoPath) {
-        setIsLoading(false);
+        if (isMounted) setIsLoading(false);
         return;
       }
 
-      setIsLoading(true);
-      setError(null);
+      if (isMounted) {
+        setIsLoading(true);
+        setError(null);
+      }
 
       try {
         const result = await runPythonScript(["--get-data"], repoPath);
+        if (!isMounted) return;
+
         if (result.error) {
           setError(result.error);
         } else {
-          setData(result);
+          setData(result as GitData);
         }
-      } catch (error) {
-        setError(String(error));
+      } catch (err) {
+        if (!isMounted) return;
+        const errorMessage = String(err);
+        setError(errorMessage);
         showToast({
           style: Toast.Style.Failure,
           title: "Failed to fetch git data",
-          message: String(error),
+          message: errorMessage,
         });
       } finally {
-        setIsLoading(false);
+        if (isMounted) setIsLoading(false);
       }
     }
+
     fetchData();
+    return () => {
+      isMounted = false;
+    };
   }, [repoPath]);
 
   return { data, isLoading, error };
