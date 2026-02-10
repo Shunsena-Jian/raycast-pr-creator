@@ -1,0 +1,4 @@
+# Add your python dependencies here
+PyGithub
+GitPython
+python-dotenv
