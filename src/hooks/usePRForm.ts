@@ -1,41 +1,62 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { showToast, Toast, open } from "@raycast/api";
 import { runPythonScript } from "../utils/shell";
 import { GitData } from "./useGitData";
+import { StrategyRecommendation } from "../utils/strategies";
+
+export interface PRFormValues {
+  source: string;
+  targets: string[];
+  jiraDetails: string;
+  titleExtension: string;
+  description: string;
+  reviewers: string[];
+}
 
 interface UsePRFormProps {
   selectedRepoPath: string | null;
   data: GitData | null;
   setPreview: (preview: { title: string; body: string } | null) => void;
+  recommendation?: StrategyRecommendation | null;
 }
 
 export function usePRForm({
   selectedRepoPath,
   data,
   setPreview,
+  recommendation,
 }: UsePRFormProps) {
-  // Form States
-  const [sourceBranch, setSourceBranch] = useState("");
-  const [targetBranches, setTargetBranches] = useState<string[]>([]);
+  // --- Form States ---
+  const [sourceBranch, setSourceBranch] = useState(
+    recommendation?.source || "",
+  );
+  const [targetBranches, setTargetBranches] = useState<string[]>(
+    recommendation?.targets || [],
+  );
   const [jiraDetails, setJiraDetails] = useState("");
   const [titleExtension, setTitleExtension] = useState("");
   const [description, setDescription] = useState("");
   const [reviewers, setReviewers] = useState<string[]>([]);
 
-  // Search states for dynamic "Add" items
+  // --- UI/Search States ---
   const [targetSearchText, setTargetSearchText] = useState("");
   const [reviewerSearchText, setReviewerSearchText] = useState("");
 
-  // Tracks if user has manually edited description to avoid overwriting it
+  // --- Refs ---
   const isDescriptionDirty = useRef(false);
 
-  // Sync initial data when repo data is fetched
+  // --- Effects ---
+
+  // Sync data when repo data or recommendation changes
   useEffect(() => {
-    if (data) {
+    if (!data) return;
+
+    if (recommendation) {
+      setSourceBranch(recommendation.source);
+      setTargetBranches(recommendation.targets);
+    } else {
       setSourceBranch(data.currentBranch);
-      setJiraDetails((data.suggestedTickets || []).join("\n"));
-      setTitleExtension(data.suggestedTitle || "");
-      // Pick first remote branch as default target if none selected
+      // Default target branch logic
       if (targetBranches.length === 0 && data.remoteBranches?.length > 0) {
         const defaultTarget =
           data.remoteBranches.find(
@@ -44,7 +65,10 @@ export function usePRForm({
         setTargetBranches([defaultTarget]);
       }
     }
-  }, [data]);
+
+    setJiraDetails((data.suggestedTickets || []).join("\n"));
+    setTitleExtension("");
+  }, [data, recommendation]);
 
   // Fetch initial description when branches are set
   useEffect(() => {
@@ -58,7 +82,9 @@ export function usePRForm({
     }
   }, [selectedRepoPath, sourceBranch, targetBranches]);
 
-  async function fetchInitialDescription() {
+  // --- Actions ---
+
+  const fetchInitialDescription = useCallback(async () => {
     if (!selectedRepoPath) return;
     try {
       const result = await runPythonScript(
@@ -71,137 +97,124 @@ export function usePRForm({
         ],
         selectedRepoPath,
       );
-      if (result.description) {
+      if (result?.description) {
         setDescription(result.description);
       }
     } catch (e) {
       console.error("Failed to fetch initial description:", e);
     }
-  }
+  }, [selectedRepoPath, sourceBranch, targetBranches]);
 
-  // Ensure current branch is in the source options
+  const handleSubmit = useCallback(
+    async (values: PRFormValues) => {
+      if (!values.targets || values.targets.length === 0) {
+        await showToast({
+          style: Toast.Style.Failure,
+          title: "Target branch is required",
+        });
+        return;
+      }
+
+      const toast = await showToast({
+        style: Toast.Style.Animated,
+        title: "Creating Pull Request(s)...",
+      });
+
+      try {
+        const args: string[] = ["--headless"];
+        args.push("--source", values.source);
+        values.targets.forEach((t: string) => {
+          args.push("--target", t);
+        });
+
+        if (values.titleExtension) args.push("--title", values.titleExtension);
+        if (values.description) args.push("--body", values.description);
+
+        const tickets = values.jiraDetails
+          .split(/[\n,]/)
+          .map((s: string) => s.trim())
+          .filter(Boolean);
+        tickets.forEach((item: string) => args.push("--tickets", item));
+
+        if (values.reviewers) {
+          values.reviewers.forEach((r: string) => args.push("--reviewers", r));
+        }
+
+        const result = await runPythonScript(
+          args,
+          selectedRepoPath || undefined,
+        );
+
+        if (result.success) {
+          const successResults = result.results.filter((r: any) => r.url);
+          const failedResults = result.results.filter((r: any) => r.error);
+          const skippedResults = result.results.filter((r: any) => r.skipped);
+
+          if (successResults.length > 0) {
+            toast.style = Toast.Style.Success;
+            toast.title = "PR(s) created successfully!";
+            toast.message = `Created ${successResults.length} PR(s)`;
+            successResults.forEach((r: any) => open(r.url));
+
+            toast.primaryAction = {
+              title: "Open PRs",
+              onAction: () => successResults.forEach((r: any) => open(r.url)),
+            };
+
+            // Reset form
+            setSourceBranch(data?.currentBranch || "");
+            setTargetBranches([]);
+            setJiraDetails("");
+            setTitleExtension("");
+            setDescription("");
+            setReviewers([]);
+            setPreview(null);
+            isDescriptionDirty.current = false;
+          } else if (failedResults.length > 0) {
+            toast.style = Toast.Style.Failure;
+            toast.title = "Failed to create PR";
+            toast.message = failedResults
+              .map((r: any) => `${r.target}: ${r.error}`)
+              .join("\n");
+          } else if (skippedResults.length > 0) {
+            toast.style = Toast.Style.Success;
+            toast.title = "Action Complete";
+            toast.message = skippedResults
+              .map((r: any) => `${r.target}: ${r.reason}`)
+              .join("\n");
+          }
+        } else {
+          throw new Error(result.error || "Unknown error");
+        }
+      } catch (error) {
+        toast.style = Toast.Style.Failure;
+        toast.title = "Failed to create PR";
+        toast.message = String(error);
+      }
+    },
+    [selectedRepoPath, data, setPreview],
+  );
+
+  // --- Derived State ---
+
   const allSourceOptions = useMemo(() => {
     const branches = [...(data?.remoteBranches || [])];
     if (data?.currentBranch && !branches.includes(data.currentBranch)) {
       branches.unshift(data.currentBranch);
     }
     return branches;
-  }, [data?.remoteBranches, data?.currentBranch]);
+  }, [data]);
 
-  // Combine fetched remote branches with any custom ones user added
-  const allTargetOptions = Array.from(
-    new Set([...(data?.remoteBranches || []), ...targetBranches]),
-  );
-  // Combine fetched contributors with any custom reviewers user added
-  const allReviewerOptions = Array.from(
-    new Set([...(data?.contributors || []), ...reviewers]),
+  const allTargetOptions = useMemo(
+    () =>
+      Array.from(new Set([...(data?.remoteBranches || []), ...targetBranches])),
+    [data, targetBranches],
   );
 
-  async function handleSubmit(values: any) {
-    if (!values.targets || values.targets.length === 0) {
-      await showToast({
-        style: Toast.Style.Failure,
-        title: "Target branch is required",
-      });
-      return;
-    }
-
-    const toast = await showToast({
-      style: Toast.Style.Animated,
-      title: "Creating Pull Request(s)...",
-    });
-
-    try {
-      const args: string[] = ["--headless"];
-      args.push("--source", values.source);
-      values.targets.forEach((t: string) => {
-        args.push("--target");
-        args.push(t);
-      });
-      if (values.titleExtension) {
-        args.push("--title");
-        args.push(values.titleExtension);
-      }
-      if (values.description) {
-        args.push("--body");
-        args.push(values.description);
-      }
-
-      const tickets = values.jiraDetails
-        .split(/[\n,]/)
-        .map((s: string) => s.trim())
-        .filter(Boolean);
-      tickets.forEach((item: string) => {
-        args.push("--tickets");
-        args.push(item);
-      });
-
-      if (values.reviewers) {
-        values.reviewers.forEach((r: string) => {
-          args.push("--reviewers");
-          args.push(r);
-        });
-      }
-
-      const result = await runPythonScript(args, selectedRepoPath || undefined);
-
-      if (result.success) {
-        const successResults = result.results.filter((r: any) => r.url);
-        const skippedResults = result.results.filter((r: any) => r.skipped);
-        const failedResults = result.results.filter((r: any) => r.error);
-
-        if (successResults.length > 0) {
-          toast.style = Toast.Style.Success;
-          toast.title = "PR(s) created successfully!";
-          toast.message = `Created ${successResults.length} PR(s)`;
-          successResults.forEach((r: any) => {
-            open(r.url);
-          });
-
-          toast.primaryAction = {
-            title: "Open PRs",
-            onAction: () => {
-              successResults.forEach((r: any) => {
-                open(r.url);
-              });
-            },
-          };
-
-          // Reset form
-          setSourceBranch(data?.currentBranch || "");
-          setTargetBranches([]);
-          setJiraDetails("");
-          setTitleExtension("");
-          setDescription("");
-          setReviewers([]);
-          setPreview(null);
-          isDescriptionDirty.current = false;
-        } else if (failedResults.length > 0) {
-          toast.style = Toast.Style.Failure;
-          toast.title = "Failed to create PR";
-          toast.message = failedResults
-            .map((r: any) => `${r.target}: ${r.error}`)
-            .join("\n");
-        } else if (skippedResults.length > 0) {
-          toast.style = Toast.Style.Success;
-          toast.title = "Action Complete";
-          toast.message = skippedResults
-            .map((r: any) => `${r.target}: ${r.reason}`)
-            .join("\n");
-        } else {
-          toast.style = Toast.Style.Success;
-          toast.title = "Done";
-          toast.message = "No new PRs were needed.";
-        }
-      } else {
-        throw new Error(result.error || "Unknown error");
-      }
-    } catch (error) {
-      toast.style = Toast.Style.Failure;
-      toast.title = "Failed to create PR";
-      toast.message = String(error);
-    }
-  }
+  const allReviewerOptions = useMemo(
+    () => Array.from(new Set([...(data?.contributors || []), ...reviewers])),
+    [data, reviewers],
+  );
 
   return {
     sourceBranch,
