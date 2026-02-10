@@ -10,7 +10,12 @@ export async function runPythonScript(
   cwd?: string,
 ): Promise<any> {
   const scriptPath = path.join(environment.assetsPath, "pr_engine.py");
-  const pythonExecutable = path.join(environment.assetsPath, "venv", "bin", "python3");
+  const pythonExecutable = path.join(
+    environment.assetsPath,
+    "venv",
+    "bin",
+    "python3",
+  );
 
   const finalArgs = [...args];
   if (cwd) {
