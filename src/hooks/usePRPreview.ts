@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { runPythonScript } from "../utils/shell";
 
 interface UsePRPreviewProps {
@@ -22,48 +22,23 @@ export function usePRPreview({
 }: UsePRPreviewProps) {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Automatic Preview Update (Debounced)
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (selectedRepoPath && sourceBranch && targetBranches.length > 0) {
-        updatePreview();
-      }
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [
-    selectedRepoPath,
-    sourceBranch,
-    targetBranches,
-    jiraDetails,
-    titleExtension,
-    description,
-  ]);
+  const updatePreview = useCallback(async () => {
+    if (!selectedRepoPath || !sourceBranch || targetBranches.length === 0)
+      return;
 
-  async function updatePreview() {
-    if (!selectedRepoPath) return;
     setIsRefreshing(true);
     try {
       const jiraItems = jiraDetails
         .split(/[\n,]/)
         .map((s) => s.trim())
         .filter(Boolean);
+
       const args = ["--get-preview", "--source", sourceBranch];
-      targetBranches.forEach((t) => {
-        args.push("--target");
-        args.push(t);
-      });
-      jiraItems.forEach((j) => {
-        args.push("--tickets");
-        args.push(j);
-      });
-      if (titleExtension) {
-        args.push("--title");
-        args.push(titleExtension);
-      }
-      if (description) {
-        args.push("--body");
-        args.push(description);
-      }
+      targetBranches.forEach((t) => args.push("--target", t));
+      jiraItems.forEach((j) => args.push("--tickets", j));
+
+      if (titleExtension) args.push("--title", titleExtension);
+      if (description) args.push("--body", description);
 
       const result = await runPythonScript(args, selectedRepoPath);
       setPreview(result);
@@ -72,7 +47,23 @@ export function usePRPreview({
     } finally {
       setIsRefreshing(false);
     }
-  }
+  }, [
+    selectedRepoPath,
+    sourceBranch,
+    targetBranches,
+    jiraDetails,
+    titleExtension,
+    description,
+    setPreview,
+  ]);
+
+  // Automatic Preview Update (Debounced)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      updatePreview();
+    }, 600); // Slightly longer debounce for better performance
+    return () => clearTimeout(timer);
+  }, [updatePreview]);
 
   return {
     isRefreshing,
