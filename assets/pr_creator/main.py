@@ -6,7 +6,8 @@ from typing import List, Optional, Dict, Any
 from .utils import print_colored, normalize_jira_link, extract_jira_id, clear_screen
 from .git import (
     is_git_repo, fetch_latest_branches, get_remote_branches, 
-    get_current_branch, get_commits_between, get_current_user_email
+    get_current_branch, get_commits_between, get_current_user_email,
+    get_repo_name
 )
 from .github import check_existing_pr, create_pr, get_contributors, get_current_username
 from .ui import select_from_list, get_multiline_input, prompt_reviewers
@@ -14,6 +15,7 @@ from .config import load_config, save_config
 from .naming import parse_branch_name
 from .strategy import prompt_strategy, resolve_placeholder_targets
 from .templates import PR_TEMPLATE
+from .slack import send_slack_notification
 
 def print_header(
     source: Optional[str] = None, 
@@ -187,6 +189,7 @@ def run_interactive() -> None:
         print_colored("Aborted.", "red")
         sys.exit(0)
 
+    results = []
     for pr in all_prs:
         print_colored(f"\n--- Processing {pr['target']} ---", "cyan")
         if check_existing_pr(source_branch, pr['target']):
@@ -195,6 +198,11 @@ def run_interactive() -> None:
         res = create_pr(source_branch, pr['target'], pr['title'], pr['body'], pr['reviewers'], skip_confirm=True)
         if res.get("url"):
             print_colored(f"Created: {res['url']}", "green")
+            results.append({**pr, "url": res["url"]})
+
+    if results:
+        print_colored("\nSending Slack notification...", "cyan")
+        send_slack_notification(results, get_repo_name(), current_handle or current_email, final_description, ticket_ids, config)
 
 def output_git_data() -> None:
     """Output git/github metadata in JSON for Raycast."""
@@ -261,8 +269,14 @@ def run_headless(args: argparse.Namespace) -> None:
             continue
             
         res = create_pr(source, target, final_title, body, reviewers, skip_confirm=True)
-        results.append({"target": target, "url": res.get("url"), "error": res.get("error")})
+        results.append({"target": target, "url": res.get("url"), "error": res.get("error"), "reviewers": reviewers})
     
+    success_results = [r for r in results if r.get("url")]
+    if success_results:
+        print("Sending Slack notification...", file=sys.stderr)
+        current_author = get_current_username() or get_current_user_email()
+        send_slack_notification(success_results, get_repo_name(), current_author, description, tickets, config)
+
     sys.stdout.write(json.dumps({"success": True, "results": results}) + "\n")
 
 def output_preview(args: argparse.Namespace) -> None:

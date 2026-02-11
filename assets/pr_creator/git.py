@@ -62,3 +62,15 @@ def get_current_user_email() -> str:
         return result.stdout.strip()
     except subprocess.CalledProcessError:
         return ""
+
+def get_repo_name() -> str:
+    """Get the repository name from the remote URL."""
+    try:
+        result = run_cmd(["git", "remote", "get-url", "origin"], capture=True)
+        url = result.stdout.strip()
+        # Handle SSH and HTTPS formats
+        if url.endswith(".git"):
+            url = url[:-4]
+        return url.split("/")[-1].split(":")[-1]
+    except Exception:
+        return "Unknown Repository"

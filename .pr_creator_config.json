@@ -2,5 +2,21 @@
     "personalized_reviewers": [
         "Jian-Cudiamat",
         "Shunsena-Jian"
-    ]
+    ],
+    "slack_webhook_url": "",
+    "slack_user_map": {
+        "Jian-Cudiamat": "U07ET10GPK3",
+        "Shunsena-Jian": "U07ET10GPK3",
+        "arriantolentino": "U07AJE90857",
+        "berns-qt": "U04D781NFAN",
+        "charlesartillero": "U078YFD8XAT",
+        "chester-qt": "U07A2SYKXC5",
+        "christian-qt": "U046349MBL7",
+        "daniellamnl-qt": "U05C330P31T",
+        "justin-qt": "UHQPAKKP0",
+        "khristinesophia14": "U07CD5DL526",
+        "kurt-qt": "U044R18G7PU",
+        "leianneza09": "U07EE7MC22X"
+    },
+    "code_review_channel": "C09A480K458"
 }

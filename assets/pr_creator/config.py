@@ -20,7 +20,10 @@ def load_config() -> Dict[str, Any]:
         "github_user_map": {},
         "ignored_authors": [],
         "jira_base_url": "https://qualitytrade.atlassian.net/browse/",
-        "personalized_reviewers": []
+        "personalized_reviewers": [],
+        "slack_webhook_url": "",
+        "slack_user_map": {},
+        "code_review_channel": ""
     }
 
     # Search paths: Current dir, Home dir
