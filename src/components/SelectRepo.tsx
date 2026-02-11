@@ -14,7 +14,11 @@ interface SelectRepoProps {
 
 export function SelectRepo({ onSelect }: SelectRepoProps) {
   const preferences = getPreferenceValues<Preferences>();
-  const repos = useRepos();
+  const { repos, isLoading } = useRepos();
+
+  if (isLoading) {
+    return <List isLoading={true} searchBarPlaceholder="Loading repositories..." />;
+  }
 
   if (repos.length === 0) {
     return (

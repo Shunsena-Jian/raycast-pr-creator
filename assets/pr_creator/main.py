@@ -10,7 +10,7 @@ from .git import (
 )
 from .github import check_existing_pr, create_pr, get_contributors, get_current_username
 from .ui import select_from_list, get_multiline_input, prompt_reviewers
-from .config import load_config
+from .config import load_config, save_config
 from .naming import parse_branch_name
 from .strategy import prompt_strategy, resolve_placeholder_targets
 from .templates import PR_TEMPLATE
@@ -205,12 +205,16 @@ def output_git_data() -> None:
     contributors = get_contributors()
     tickets_auto, title_auto = parse_branch_name(current_branch)
     
+    config = load_config()
+    personalized_reviewers = config.get("personalized_reviewers", [])
+
     data = {
         "currentBranch": current_branch,
         "remoteBranches": remote_branches,
         "contributors": contributors,
         "suggestedTickets": tickets_auto,
-        "suggestedTitle": title_auto
+        "suggestedTitle": title_auto,
+        "personalizedReviewers": personalized_reviewers
     }
     sys.stdout.write(json.dumps(data) + "\n")
 
@@ -222,6 +226,7 @@ def output_description(source: str, target: str) -> None:
 
 def run_headless(args: argparse.Namespace) -> None:
     """Execute PR creation without interaction."""
+    fetch_latest_branches()
     source = args.source or get_current_branch()
     targets = args.target or []
     title_base = args.title or ""
@@ -282,6 +287,7 @@ def main() -> None:
     parser.add_argument("--get-data", action="store_true")
     parser.add_argument("--get-description", action="store_true")
     parser.add_argument("--get-preview", action="store_true")
+    parser.add_argument("--save-reviewers", action="store_true")
     
     parser.add_argument("--source")
     parser.add_argument("--target", action="append")
@@ -312,6 +318,9 @@ def main() -> None:
         output_preview(args)
     elif args.headless:
         run_headless(args)
+    elif args.save_reviewers:
+        save_config({"personalized_reviewers": args.reviewers or []})
+        sys.stdout.write(json.dumps({"success": True}) + "\n")
     else:
         run_interactive()
 
