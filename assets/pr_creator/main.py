@@ -272,10 +272,11 @@ def run_headless(args: argparse.Namespace) -> None:
         results.append({"target": target, "url": res.get("url"), "error": res.get("error"), "reviewers": reviewers})
     
     success_results = [r for r in results if r.get("url")]
+    repo_name = get_repo_name()
     if success_results:
         print("Sending Slack notification...", file=sys.stderr)
         current_author = get_current_username() or get_current_user_email()
-        send_slack_notification(success_results, get_repo_name(), current_author, description, tickets, config)
+        send_slack_notification(success_results, repo_name, current_author, description, tickets, config, wait_for_thread=True)
 
     sys.stdout.write(json.dumps({"success": True, "results": results}) + "\n")
 

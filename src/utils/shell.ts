@@ -1,9 +1,6 @@
-import { execFile } from "child_process";
+import { spawn } from "child_process";
 import path from "path";
-import { promisify } from "util";
 import { environment } from "@raycast/api";
-
-const execFileAsync = promisify(execFile);
 
 export async function runPythonScript(
   args: string[],
@@ -22,33 +19,53 @@ export async function runPythonScript(
     finalArgs.push(cwd);
   }
 
-  try {
-    const { stdout, stderr } = await execFileAsync(
-      pythonExecutable,
-      [scriptPath, ...finalArgs],
-      {
-        cwd,
-        env: {
-          ...process.env,
-          PATH: `/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${process.env.PATH}`,
-        },
-        maxBuffer: 10 * 1024 * 1024,
+  return new Promise((resolve, reject) => {
+    const child = spawn(pythonExecutable, [scriptPath, ...finalArgs], {
+      cwd,
+      env: {
+        ...process.env,
+        PATH: `/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${process.env.PATH}`,
       },
-    );
-    if (stderr && !stdout) {
-      console.warn("Python stderr:", stderr);
-    }
-    return JSON.parse(stdout);
-  } catch (error: any) {
-    console.error("Python Execution Error:", error);
-    // Attempt to parse JSON from stdout even if it failed (it might have printed error JSON)
-    if (error.stdout) {
-      try {
-        return JSON.parse(error.stdout);
-      } catch (e) {
-        // ignore
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    let stdout = "";
+    let stderr = "";
+
+    child.stdout?.on("data", (data) => {
+      stdout += data;
+    });
+
+    child.stderr?.on("data", (data) => {
+      const output = data.toString();
+      stderr += output;
+      process.stderr.write(output);
+    });
+
+    child.on("close", (code) => {
+      if (stderr && code !== 0) {
+        console.error(`Python script encountered errors (Code ${code}):\n${stderr}`);
       }
-    }
-    throw error;
-  }
+
+      if (!stdout && code !== 0) {
+        reject(new Error(`Python script exited with code ${code}`));
+        return;
+      }
+
+      try {
+        resolve(JSON.parse(stdout));
+      } catch (e) {
+        if (code !== 0) {
+          reject(new Error(`Python script exited with code ${code}`));
+        } else {
+          reject(new Error(`Failed to parse Python output: ${stdout}`));
+        }
+      }
+    });
+
+    child.on("error", (err) => {
+      console.error("Failed to start Python script:", err);
+      reject(err);
+    });
+  });
 }
