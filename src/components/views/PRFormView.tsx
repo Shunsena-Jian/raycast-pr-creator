@@ -6,7 +6,8 @@ import { usePRPreview } from "../../hooks/usePRPreview";
 import { usePRForm } from "../../hooks/usePRForm";
 import {
   getReleaseStages,
-  getHotfixStages,
+  getChildHotfixStages,
+  getParentHotfixStages,
   StrategyRecommendation,
 } from "../../utils/strategies";
 
@@ -21,7 +22,7 @@ export function PRFormView({
   selectedRepoPath: initialRepoPath,
   recommendation: initialRecommendation,
 }: PRFormViewProps) {
-  const repos = useRepos();
+  const { repos, isLoading: isReposLoading } = useRepos();
   const [repoPath, setRepoPath] = useState(initialRepoPath);
 
   // Only fetch if the user changes the repo from the initial one
@@ -50,11 +51,18 @@ export function PRFormView({
         currentData.currentBranch,
         currentData.remoteBranches,
       );
-    if (strategyType === "hotfix")
-      return getHotfixStages(
-        currentData.currentBranch,
-        currentData.remoteBranches,
-      );
+    if (strategyType === "hotfix") {
+      return [
+        ...getChildHotfixStages(
+          currentData.currentBranch,
+          currentData.remoteBranches,
+        ),
+        ...getParentHotfixStages(
+          currentData.currentBranch,
+          currentData.remoteBranches,
+        ),
+      ];
+    }
     return [];
   }, [currentData, strategyType]);
 
@@ -129,6 +137,7 @@ export function PRFormView({
         title="Repository"
         value={repoPath}
         onChange={setRepoPath}
+        isLoading={isReposLoading}
       >
         {repos.map((r) => (
           <Form.Dropdown.Item key={r.path} value={r.path} title={r.name} />

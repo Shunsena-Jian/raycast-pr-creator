@@ -2,13 +2,16 @@ import { ActionPanel, Action, Detail, useNavigation } from "@raycast/api";
 import { useGitData } from "../../hooks/useGitData";
 import { StrategyList } from "./StrategyList";
 import { SelectRepo } from "../SelectRepo";
+import { ReviewerSelectionView } from "./ReviewerSelectionView";
+import { useState } from "react";
 
 export function StrategyLoader({
   selectedRepoPath,
 }: {
   selectedRepoPath: string;
 }) {
-  const { data, isLoading, error } = useGitData(selectedRepoPath);
+  const { data, isLoading, error, saveReviewers } = useGitData(selectedRepoPath);
+  const [hasSkippedReviewers, setHasSkippedReviewers] = useState(false);
 
   if (isLoading || (!data && !error)) {
     return <Detail isLoading={true} />;
@@ -21,7 +24,7 @@ export function StrategyLoader({
 ${error || (data as any)?.error || "Failed to load git data."}`}
         actions={
           <ActionPanel>
-            <Action title="Try Again" onAction={() => {}} />
+            <Action title="Try Again" onAction={() => { }} />
           </ActionPanel>
         }
       />
@@ -29,6 +32,20 @@ ${error || (data as any)?.error || "Failed to load git data."}`}
   }
 
   if (!data) return null;
+
+  // Prompt for reviewer selection if not already configured and we haven't skipped it
+  if (data.personalizedReviewers.length === 0 && !hasSkippedReviewers) {
+    return (
+      <ReviewerSelectionView
+        data={data}
+        onSave={async (reviewers) => {
+          const success = await saveReviewers(reviewers);
+          return success;
+        }}
+        onSkip={() => setHasSkippedReviewers(true)}
+      />
+    );
+  }
 
   return <StrategyList data={data} selectedRepoPath={selectedRepoPath} />;
 }

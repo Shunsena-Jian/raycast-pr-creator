@@ -9,6 +9,10 @@ export interface Stage {
   recommendation: StrategyRecommendation;
 }
 
+export const STAGING_REGEX = /^release\/\d+\.\d+\.\d+$/;
+export const ALPHA_REGEX = /^release\/\d+\.\d+\.\d+-a$/;
+export const BETA_REGEX = /^release\/\d+\.\d+\.\d+-b$/;
+
 /**
  * Determines release stages based on naming conventions:
  * - release/x.y.z (Staging)
@@ -19,13 +23,12 @@ export function getReleaseStages(
   currentBranch: string,
   remoteBranches: string[],
 ): Stage[] {
-  const releaseBranches = remoteBranches.filter(
-    (b) => b.startsWith("release/") && !b.endsWith("-a") && !b.endsWith("-b"),
-  );
-  const alphaBranches = remoteBranches.filter((b) => b.endsWith("-a"));
-  const betaBranches = remoteBranches.filter((b) => b.endsWith("-b"));
+  const releaseBranches = remoteBranches.filter((b) => STAGING_REGEX.test(b));
+  const alphaBranches = remoteBranches.filter((b) => ALPHA_REGEX.test(b));
+  const betaBranches = remoteBranches.filter((b) => BETA_REGEX.test(b));
 
   const stages: Stage[] = [];
+// ... (rest of the function remains similar)
 
   // 1. Feature/Bugfix -> Develop & Staging
   releaseBranches.forEach((rb) => {
@@ -96,11 +99,34 @@ export function getReleaseStages(
 }
 
 /**
- * Determines hotfix stages based on naming conventions:
- * - hotfix/x.y.z (Parent Hotfix)
- * - hotfix/x.y.z-foo (Child Hotfix)
+ * Determines child hotfix stages (Child -> Parent)
  */
-export function getHotfixStages(
+export function getChildHotfixStages(
+  currentBranch: string,
+  remoteBranches: string[],
+): Stage[] {
+  const hotfixBranches = remoteBranches.filter((b) => b.startsWith("hotfix/"));
+  const childHotfixes = hotfixBranches.filter((b) =>
+    b.replace("hotfix/", "").includes("-"),
+  );
+
+  return childHotfixes.map((ch) => {
+    const parent = ch.split("-")[0];
+    return {
+      title: `${ch} -> ${parent}`,
+      recommendation: {
+        name: "Hotfix: Child",
+        source: ch,
+        targets: [parent],
+      },
+    };
+  });
+}
+
+/**
+ * Determines parent hotfix stages (Parent -> All)
+ */
+export function getParentHotfixStages(
   currentBranch: string,
   remoteBranches: string[],
 ): Stage[] {
@@ -108,35 +134,16 @@ export function getHotfixStages(
   const parentHotfixes = hotfixBranches.filter(
     (b) => !b.replace("hotfix/", "").includes("-"),
   );
-  const childHotfixes = hotfixBranches.filter((b) =>
-    b.replace("hotfix/", "").includes("-"),
-  );
 
-  const stages: Stage[] = [];
-
-  // 1. Child -> Parent
-  childHotfixes.forEach((ch) => {
-    const parent = ch.split("-")[0];
-    stages.push({
-      title: `${ch} -> ${parent}`,
-      recommendation: {
-        name: "Hotfix: Child",
-        source: ch,
-        targets: [parent],
-      },
-    });
-  });
-
-  // 2. Parent -> All Branches (Sync)
-  parentHotfixes.forEach((ph) => {
-    const releaseBranch = remoteBranches.find(
-      (b) => b.startsWith("release/") && !b.endsWith("-a") && !b.endsWith("-b"),
+  return parentHotfixes.map((ph) => {
+    const sortedBranches = [...remoteBranches].sort((a, b) =>
+      b.localeCompare(a, undefined, { numeric: true }),
     );
-    const alphaBranch = remoteBranches.find((b) => b.endsWith("-a"));
-    const betaBranch = remoteBranches.find((b) => b.endsWith("-b"));
+    const releaseBranch = sortedBranches.find((b) => STAGING_REGEX.test(b));
+    const alphaBranch = sortedBranches.find((b) => ALPHA_REGEX.test(b));
+    const betaBranch = sortedBranches.find((b) => BETA_REGEX.test(b));
 
-    const targets = ["develop"];
-    if (releaseBranch) targets.push(releaseBranch);
+    const targets = ["develop"];    if (releaseBranch) targets.push(releaseBranch);
     if (alphaBranch) targets.push(alphaBranch);
     if (betaBranch) targets.push(betaBranch);
 
@@ -147,15 +154,13 @@ export function getHotfixStages(
         : "main";
     targets.push(liveBranch);
 
-    stages.push({
+    return {
       title: `${ph} -> All Branches (Propagate)`,
       recommendation: {
         name: "Hotfix: Parent->All",
         source: ph,
         targets: Array.from(new Set(targets)),
       },
-    });
+    };
   });
-
-  return stages;
 }

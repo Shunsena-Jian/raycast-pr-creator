@@ -1,55 +1,53 @@
-import { useState, useEffect, useMemo } from "react";
 import { getPreferenceValues } from "@raycast/api";
-import fs from "fs";
+import { useCachedPromise } from "@raycast/utils";
+import fs from "fs/promises";
+import { existsSync } from "fs";
 import path from "path";
 
 export interface Preferences {
   projectsDirectory: string;
 }
 
+export interface Repo {
+  name: string;
+  path: string;
+}
+
 export function useRepos() {
-  const [preferences, setPreferences] = useState<Preferences | null>(null);
+  const preferences = getPreferenceValues<Preferences>();
 
-  useEffect(() => {
-    try {
-      const prefs = getPreferenceValues<Preferences>();
-      setPreferences(prefs);
-    } catch (e) {
-      console.error("Failed to load preferences:", e);
-    }
-  }, []);
+  const { data, isLoading } = useCachedPromise(
+    async (projectsDir: string): Promise<Repo[]> => {
+      const baseDir = projectsDir.replace("~", process.env.HOME || "");
 
-  return useMemo(() => {
-    if (!preferences?.projectsDirectory) return [];
+      try {
+        if (!existsSync(baseDir)) return [];
 
-    const baseDir = preferences.projectsDirectory.replace(
-      "~",
-      process.env.HOME || "",
-    );
+        const files = await fs.readdir(baseDir);
+        const repos: Repo[] = [];
 
-    try {
-      if (!fs.existsSync(baseDir)) return [];
-
-      return fs
-        .readdirSync(baseDir)
-        .filter((file) => {
+        for (const file of files) {
           const fullPath = path.join(baseDir, file);
           try {
-            return (
-              fs.statSync(fullPath).isDirectory() &&
-              fs.existsSync(path.join(fullPath, ".git"))
-            );
+            const stat = await fs.stat(fullPath);
+            if (stat.isDirectory() && existsSync(path.join(fullPath, ".git"))) {
+              repos.push({
+                name: file,
+                path: fullPath,
+              });
+            }
           } catch (e) {
-            return false;
+            // Ignore individual stat errors
           }
-        })
-        .map((file) => ({
-          name: file,
-          path: path.join(baseDir, file),
-        }));
-    } catch (e) {
-      console.error("Failed to read repositories:", e);
-      return [];
-    }
-  }, [preferences?.projectsDirectory]);
+        }
+        return repos;
+      } catch (e) {
+        console.error("Failed to read repositories:", e);
+        return [];
+      }
+    },
+    [preferences.projectsDirectory],
+  );
+
+  return { repos: data || [], isLoading };
 }
