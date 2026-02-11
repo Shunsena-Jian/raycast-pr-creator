@@ -18,10 +18,14 @@ declare type Preferences = ExtensionPreferences
 declare namespace Preferences {
   /** Preferences accessible in the `create-pr` command */
   export type CreatePr = ExtensionPreferences & {}
+  /** Preferences accessible in the `manage-reviewers` command */
+  export type ManageReviewers = ExtensionPreferences & {}
 }
 
 declare namespace Arguments {
   /** Arguments passed to the `create-pr` command */
   export type CreatePr = {}
+  /** Arguments passed to the `manage-reviewers` command */
+  export type ManageReviewers = {}
 }
 

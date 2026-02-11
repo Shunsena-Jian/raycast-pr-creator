@@ -12,6 +12,13 @@
             "subtitle": "QualityTrade",
             "description": "Open form to create a new PR",
             "mode": "view"
+        },
+        {
+            "name": "manage-reviewers",
+            "title": "Manage Reviewers",
+            "subtitle": "QualityTrade",
+            "description": "Modify personalized reviewers list",
+            "mode": "view"
         }
     ],
     "preferences": [

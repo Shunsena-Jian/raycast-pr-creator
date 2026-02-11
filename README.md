@@ -9,6 +9,8 @@ A powerful Raycast extension designed to streamline the Pull Request lifecycle. 
 - **Smart Descriptions:** Auto-generates PR descriptions by aggregating commit messages between source and target branches.
 - **Multi-Target PRs:** Create multiple PRs simultaneously (e.g., to `develop` and `staging`) with a single click.
 - **Reviewer Management:** Integration with GitHub contributors to easily assign reviewers.
+- **Personalized Reviewers:** Create a repository-specific list of preferred reviewers to filter out inactive members.
+- **Manage Reviewers Command:** A dedicated command to update your personalized reviewers list at any time.
 - **Real-time Preview:** Live preview of PR title and body as you configure the form.
 
 ## 🚀 Installation
@@ -53,6 +55,10 @@ Create a `.pr_creator_config.json` in your **Home folder** (`~`) to customize th
   "ignored_authors": ["bot", "dependabot"]
 }
 ```
+
+### Managing Reviewers
+
+You can modify your personalized reviewers for any repository at any time using the **Manage Reviewers** command. This is useful when team members change or you want to refine your default reviewer list for a specific project. The list is stored in a `.pr_creator_config.json` file at the root of your repository.
 
 ## 🛠 Development
 
