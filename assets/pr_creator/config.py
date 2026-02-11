@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Any, Dict
 
@@ -18,7 +19,8 @@ def load_config() -> Dict[str, Any]:
         "reviewer_groups": {},
         "github_user_map": {},
         "ignored_authors": [],
-        "jira_base_url": "https://qualitytrade.atlassian.net/browse/"
+        "jira_base_url": "https://qualitytrade.atlassian.net/browse/",
+        "personalized_reviewers": []
     }
 
     # Search paths: Current dir, Home dir
@@ -32,12 +34,38 @@ def load_config() -> Dict[str, Any]:
             try:
                 with open(path, "r") as f:
                     user_config = json.load(f)
-                    defaults.update(user_config)
+                    # Use update to merge, but ensure defaults are respected
+                    for key, value in user_config.items():
+                        defaults[key] = value
                     return defaults
             except json.JSONDecodeError:
-                print(f"Warning: Failed to parse config file at {path}. Using defaults.")
+                print(f"Warning: Failed to parse config file at {path}. Using defaults.", file=sys.stderr)
     
     return defaults
+
+def save_config(config_dict: Dict[str, Any]):
+    """
+    Saves the configuration to .pr_creator_config.json in the current directory.
+    """
+    target_path = Path.cwd() / CONFIG_FILENAME
+    
+    # Load existing to merge if necessary, or just overwrite if it's meant to be full
+    current_config = {}
+    if target_path.exists():
+        try:
+            with open(target_path, "r") as f:
+                current_config = json.load(f)
+        except json.JSONDecodeError:
+            pass
+            
+    current_config.update(config_dict)
+    
+    try:
+        with open(target_path, "w") as f:
+            json.dump(current_config, f, indent=4)
+        print(f"Saved configuration to {target_path}", file=sys.stderr)
+    except OSError as e:
+        print(f"Warning: Failed to save config: {e}", file=sys.stderr)
 
 def add_to_user_map(email: str, handle: str):
     """
@@ -70,6 +98,6 @@ def add_to_user_map(email: str, handle: str):
     try:
         with open(target_path, "w") as f:
             json.dump(current_config, f, indent=4)
-        print(f"Saved mapping for {email} to {target_path}")
+        print(f"Saved mapping for {email} to {target_path}", file=sys.stderr)
     except OSError as e:
-        print(f"Warning: Failed to save config: {e}")
+        print(f"Warning: Failed to save config: {e}", file=sys.stderr)

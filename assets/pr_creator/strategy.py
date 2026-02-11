@@ -1,5 +1,10 @@
+import re
 from .utils import print_colored
 from .ui import select_from_list
+
+STAGING_PATTERN = r"release/\d+\.\d+\.\d+$"
+ALPHA_PATTERN = r"release/\d+\.\d+\.\d+-a$"
+BETA_PATTERN = r"release/\d+\.\d+\.\d+-b$"
 
 def prompt_strategy(current_branch: str, remote_branches: list[str]) -> tuple[str, str, list[str]]:
     """
@@ -32,16 +37,12 @@ def prompt_strategy(current_branch: str, remote_branches: list[str]) -> tuple[st
         elif "staging -> alpha" in stage:
             # Source must be release/0.0.0
             # Check if current matches
-            is_valid_staging = (
-                source.startswith("release/") and 
-                not source.endswith("-a") and 
-                not source.endswith("-b")
-            )
+            is_valid_staging = bool(re.match(STAGING_PATTERN, source))
             
             if not is_valid_staging:
                 print_colored("Current branch is not a valid Staging branch (release/x.y.z).", "yellow")
                 # Find valid candidates
-                candidates = [b for b in remote_branches if "release/" in b and not b.endswith("-a") and not b.endswith("-b")]
+                candidates = [b for b in remote_branches if re.match(STAGING_PATTERN, b)]
                 if candidates:
                     source = select_from_list("Select Source Staging Branch:", candidates)
                 else:
@@ -52,11 +53,11 @@ def prompt_strategy(current_branch: str, remote_branches: list[str]) -> tuple[st
 
         elif "alpha -> beta" in stage:
             # Source must be release/0.0.0-a
-            is_valid_alpha = source.startswith("release/") and source.endswith("-a")
+            is_valid_alpha = bool(re.match(ALPHA_PATTERN, source))
             
             if not is_valid_alpha:
                 print_colored("Current branch is not a valid Alpha branch (release/x.y.z-a).", "yellow")
-                candidates = [b for b in remote_branches if b.startswith("release/") and b.endswith("-a")]
+                candidates = [b for b in remote_branches if re.match(ALPHA_PATTERN, b)]
                 if candidates:
                     source = select_from_list("Select Source Alpha Branch:", candidates)
                 else:
@@ -67,11 +68,11 @@ def prompt_strategy(current_branch: str, remote_branches: list[str]) -> tuple[st
 
         elif "beta -> live" in stage:
             # Source must be release/0.0.0-b
-            is_valid_beta = source.startswith("release/") and source.endswith("-b")
+            is_valid_beta = bool(re.match(BETA_PATTERN, source))
             
             if not is_valid_beta:
                  print_colored("Current branch is not a valid Beta branch (release/x.y.z-b).", "yellow")
-                 candidates = [b for b in remote_branches if b.startswith("release/") and b.endswith("-b")]
+                 candidates = [b for b in remote_branches if re.match(BETA_PATTERN, b)]
                  if candidates:
                      source = select_from_list("Select Source Beta Branch:", candidates)
                  else:
@@ -134,11 +135,20 @@ def resolve_placeholder_targets(targets: list[str], remote_branches: list[str], 
     """
     resolved = []
     
+    # Sort branches numerically to prioritize latest version
+    import locale
+    try:
+        from natsort import natsorted
+        sorted_branches = natsorted(remote_branches, reverse=True)
+    except ImportError:
+        # Fallback if natsort is not available
+        sorted_branches = sorted(remote_branches, reverse=True)
+
     # Filter for release branches
-    release_branches = [b for b in remote_branches if "release/" in b and not b.endswith("-a") and not b.endswith("-b")]
-    alpha_branches = [b for b in remote_branches if b.endswith("-a")]
-    beta_branches = [b for b in remote_branches if b.endswith("-b")]
-    hotfix_branches = [b for b in remote_branches if "hotfix/" in b]
+    release_branches = [b for b in sorted_branches if re.match(STAGING_PATTERN, b)]
+    alpha_branches = [b for b in sorted_branches if re.match(ALPHA_PATTERN, b)]
+    beta_branches = [b for b in sorted_branches if re.match(BETA_PATTERN, b)]
+    hotfix_branches = [b for b in sorted_branches if "hotfix/" in b]
     
     for t in targets:
         if t == "staging_placeholder":
