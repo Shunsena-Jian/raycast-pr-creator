@@ -121,6 +121,14 @@ export function usePRForm({
         return;
       }
 
+      if (!values.reviewers || values.reviewers.length === 0) {
+        await showToast({
+          style: Toast.Style.Failure,
+          title: "At least one reviewer is required",
+        });
+        return;
+      }
+
       const toast = await showToast({
         style: Toast.Style.Animated,
         title: "Creating Pull Request(s)...",

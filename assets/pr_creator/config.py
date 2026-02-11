@@ -6,13 +6,38 @@ from typing import Any, Dict
 
 CONFIG_FILENAME = ".pr_creator_config.json"
 
+def manual_load_env():
+    """
+    Manually load .env file from the current directory if it exists.
+    This is used as a fallback if python-dotenv is not installed.
+    """
+    env_path = Path.cwd() / ".env"
+    if env_path.exists():
+        try:
+            with open(env_path, "r") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith("#"):
+                        continue
+                    if "=" in line:
+                        key, value = line.split("=", 1)
+                        # Remove quotes if present
+                        value = value.strip().strip("'\"")
+                        if key.strip() not in os.environ:
+                            os.environ[key.strip()] = value
+        except Exception as e:
+            print(f"Warning: Failed to load .env file: {e}", file=sys.stderr)
+
 def load_config() -> Dict[str, Any]:
     """
     Load configuration from:
-    1. Check current directory
-    2. Check user home directory
-    3. Return defaults if nothing found
+    1. .env file (manual load)
+    2. Check current directory
+    3. Check user home directory
+    4. Return defaults if nothing found
     """
+    manual_load_env()
+    
     defaults = {
         "default_target_branch": "main",
         "jira_project_keys": [],
@@ -20,7 +45,10 @@ def load_config() -> Dict[str, Any]:
         "github_user_map": {},
         "ignored_authors": [],
         "jira_base_url": "https://qualitytrade.atlassian.net/browse/",
-        "personalized_reviewers": []
+        "personalized_reviewers": [],
+        "slack_webhook_url": "",
+        "slack_user_map": {},
+        "code_review_channel": ""
     }
 
     # Search paths: Current dir, Home dir
