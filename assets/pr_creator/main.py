@@ -128,7 +128,9 @@ def run_interactive() -> None:
 
     print_header(source_branch, targets, strategy_name, tickets=ticket_ids)
 
-    ticket_prefix = "".join([f"[{tid}]" for tid in ticket_ids])
+    # Filter only valid ticket IDs for the prefix
+    valid_ticket_ids = [extract_jira_id(tid) for tid in ticket_ids if extract_jira_id(tid)]
+    ticket_prefix = "".join([f"[{tid}]" for tid in valid_ticket_ids])
     preview_target = targets[0] if targets else "target"
     
     print_colored("\n--- Title Configuration ---", "cyan")
@@ -243,7 +245,9 @@ def run_headless(args: argparse.Namespace) -> None:
     
     jira_links = [normalize_jira_link(t, jira_base_url) for t in tickets]
     jira_section = "\n".join(jira_links) if jira_links else "None"
-    ticket_prefix = "".join([f"[{extract_jira_id(tid)}]" for tid in tickets])
+    # Filter only valid ticket IDs for the prefix
+    valid_ticket_ids = [extract_jira_id(tid) for tid in tickets if extract_jira_id(tid)]
+    ticket_prefix = "".join([f"[{tid}]" for tid in valid_ticket_ids])
     
     results = []
     for target in targets:
