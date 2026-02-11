@@ -27,24 +27,45 @@ def run_cmd(cmd: List[str], check: bool = True, capture: bool = False) -> subpro
     """Run a subprocess command safely."""
     return subprocess.run(cmd, check=check, capture_output=capture, text=True)
 
-def extract_jira_id(input_str: str) -> str:
-    """Extract JIRA ticket ID (e.g. PROJ-123) from a string or URL."""
+def extract_jira_id(input_str: str) -> Optional[str]:
+    """
+    Extract JIRA ticket ID (e.g. PROJ-123) from a string or URL.
+    Returns None if no valid ticket ID is found.
+    """
     input_str = input_str.strip()
     
     # Match something like /browse/PROJ-123 or just PROJ-123
-    match = re.search(r'([A-Z]+-\d+)', input_str, re.IGNORECASE)
+    # We look for [A-Z]+ followed by a dash and digits.
+    # We avoid matching version numbers or other IDs in URLs.
+    match = re.search(r'(?<=browse/)([A-Z]+-\d+)', input_str, re.IGNORECASE)
+    if not match:
+        # If not in browse/ URL, check if the whole string is a ticket ID
+        # or if it's a simple string containing a ticket ID.
+        match = re.search(r'\b([A-Z]+-\d+)\b', input_str, re.IGNORECASE)
+        
     if match:
         return match.group(1).upper()
     
-    return input_str
+    return None
 
 def normalize_jira_link(ticket_input: str, base_url: str) -> str:
-    """Convert ticket ID or URL to a markdown link with ID as label."""
+    """Convert ticket ID or URL to a markdown link with ID or fallback as label."""
     ticket_id = extract_jira_id(ticket_input)
     
-    # Ensure base_url ends with slash
-    if not base_url.endswith("/"):
-        base_url += "/"
+    if ticket_id:
+        # Ensure base_url ends with slash
+        if not base_url.endswith("/"):
+            base_url += "/"
+        url = ticket_input if ticket_input.startswith("http") else f"{base_url}{ticket_id}"
+        return f"[{ticket_id}]({url})"
+    
+    # Fallback for non-ticket URLs
+    if ticket_input.startswith("http"):
+        label = "[Link]"
+        if "release" in ticket_input.lower():
+            label = "[Release]"
+        elif "version" in ticket_input.lower():
+            label = "[Version]"
+        return f"{label}({ticket_input})"
         
-    url = ticket_input if ticket_input.startswith("http") else f"{base_url}{ticket_id}"
-    return f"[{ticket_id}]({url})"
+    return ticket_input
