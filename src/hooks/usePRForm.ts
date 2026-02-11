@@ -47,6 +47,12 @@ export function usePRForm({
 
   // --- Effects ---
 
+  // Reset description state when repository changes
+  useEffect(() => {
+    isDescriptionDirty.current = false;
+    setDescription("");
+  }, [selectedRepoPath]);
+
   // Sync data when repo data or recommendation changes
   useEffect(() => {
     if (!data) return;
