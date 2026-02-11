@@ -8,6 +8,7 @@ export interface GitData {
   contributors: string[];
   suggestedTickets: string[];
   suggestedTitle: string;
+  personalizedReviewers: string[];
   error?: string;
 }
 
@@ -59,5 +60,24 @@ export function useGitData(repoPath?: string) {
     };
   }, [repoPath]);
 
-  return { data, isLoading, error };
+  const saveReviewers = async (reviewers: string[]) => {
+    if (!repoPath) return false;
+    try {
+      const args = ["--save-reviewers"];
+      reviewers.forEach((r) => args.push("--reviewers", r));
+      const result = await runPythonScript(args, repoPath);
+      if (result.success) {
+        // Refresh data
+        const freshData = await runPythonScript(["--get-data"], repoPath);
+        setData(freshData as GitData);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error("Failed to save reviewers:", err);
+      return false;
+    }
+  };
+
+  return { data, isLoading, error, saveReviewers };
 }

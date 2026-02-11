@@ -47,6 +47,12 @@ export function usePRForm({
 
   // --- Effects ---
 
+  // Reset description state when repository changes
+  useEffect(() => {
+    isDescriptionDirty.current = false;
+    setDescription("");
+  }, [selectedRepoPath]);
+
   // Sync data when repo data or recommendation changes
   useEffect(() => {
     if (!data) return;
@@ -211,10 +217,15 @@ export function usePRForm({
     [data, targetBranches],
   );
 
-  const allReviewerOptions = useMemo(
-    () => Array.from(new Set([...(data?.contributors || []), ...reviewers])),
-    [data, reviewers],
-  );
+  const allReviewerOptions = useMemo(() => {
+    const personalized = data?.personalizedReviewers || [];
+    if (personalized.length > 0) {
+      // If personalized reviewers are set, only show those as options
+      return Array.from(new Set([...personalized, ...reviewers]));
+    }
+    // Otherwise show all contributors
+    return Array.from(new Set([...(data?.contributors || []), ...reviewers]));
+  }, [data, reviewers]);
 
   return {
     sourceBranch,

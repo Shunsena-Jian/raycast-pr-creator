@@ -2,14 +2,20 @@ import { List, ActionPanel, Action, Icon, useNavigation } from "@raycast/api";
 import { GitData } from "../../hooks/useGitData";
 import { PRFormView } from "./PRFormView";
 import { StageList } from "./StageList";
+import { HotfixStageView } from "./HotfixStageView";
+import { ReviewerSelectionView } from "./ReviewerSelectionView";
+import { useGitData } from "../../hooks/useGitData";
 
 interface StrategyListProps {
   data: GitData;
   selectedRepoPath: string;
 }
 
-export function StrategyList({ data, selectedRepoPath }: StrategyListProps) {
+export function StrategyList({ data: initialData, selectedRepoPath }: StrategyListProps) {
   const { push, pop } = useNavigation();
+  const { data, saveReviewers } = useGitData(selectedRepoPath);
+
+  const currentData = data || initialData;
 
   return (
     <List navigationTitle="Select Strategy">
@@ -24,11 +30,28 @@ export function StrategyList({ data, selectedRepoPath }: StrategyListProps) {
                 push(
                   <StageList
                     type="release"
-                    data={data}
+                    data={currentData}
                     selectedRepoPath={selectedRepoPath}
                   />,
                 )
               }
+            />
+            <Action
+              title="Configure Reviewers"
+              icon={Icon.Person}
+              onAction={() =>
+                push(
+                  <ReviewerSelectionView
+                    data={currentData}
+                    onSave={async (reviewers) => {
+                      const success = await saveReviewers(reviewers);
+                      return success;
+                    }}
+                    onSkip={() => pop()}
+                  />,
+                )
+              }
+              shortcut={{ modifiers: ["cmd", "shift"], key: "r" }}
             />
             <Action
               title="Change Repository"
@@ -47,9 +70,8 @@ export function StrategyList({ data, selectedRepoPath }: StrategyListProps) {
               title="Select Hotfix Strategy"
               onAction={() =>
                 push(
-                  <StageList
-                    type="hotfix"
-                    data={data}
+                  <HotfixStageView
+                    data={currentData}
                     selectedRepoPath={selectedRepoPath}
                   />,
                 )
@@ -73,7 +95,7 @@ export function StrategyList({ data, selectedRepoPath }: StrategyListProps) {
               onAction={() =>
                 push(
                   <PRFormView
-                    data={data}
+                    data={currentData}
                     selectedRepoPath={selectedRepoPath}
                     recommendation={null}
                   />,
