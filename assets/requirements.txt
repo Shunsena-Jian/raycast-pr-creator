@@ -2,3 +2,4 @@
 PyGithub
 GitPython
 python-dotenv
+natsort

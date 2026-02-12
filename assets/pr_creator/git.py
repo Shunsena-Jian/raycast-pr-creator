@@ -46,9 +46,25 @@ def get_current_branch() -> str:
 def get_commits_between(base: str, head: str) -> list[str]:
     """Get list of commit subject lines between base and head."""
     try:
-        # --no-merges to skip merge commits, --oneline for subject only (but we want clean subject)
-        # using formatted log to get just the subject
-        cmd = ["git", "log", f"origin/{base}..{head}", "--no-merges", "--pretty=format:%s"]
+        # Check if origin/{base} exists
+        base_ref = f"origin/{base}"
+        try:
+            run_cmd(["git", "rev-parse", "--verify", base_ref], capture=True)
+        except subprocess.CalledProcessError:
+            # Fallback to local base if origin/base is missing
+            base_ref = base
+            try:
+                run_cmd(["git", "rev-parse", "--verify", base_ref], capture=True)
+            except subprocess.CalledProcessError:
+                return []
+
+        # --no-merges to skip merge commits
+        try:
+            run_cmd(["git", "rev-parse", "--verify", head], capture=True)
+        except subprocess.CalledProcessError:
+            return []
+
+        cmd = ["git", "log", f"{base_ref}..{head}", "--no-merges", "--pretty=format:%s"]
         result = run_cmd(cmd, capture=True)
         lines = [line.strip() for line in result.stdout.splitlines() if line.strip()]
         return lines
