@@ -1,11 +1,6 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
-import {
-  showToast,
-  Toast,
-  open,
-  getPreferenceValues,
-  LocalStorage,
-} from "@raycast/api";
+import { showToast, Toast, open, getPreferenceValues } from "@raycast/api";
+import { useCachedState } from "@raycast/utils";
 import { runPythonScript } from "../utils/shell";
 import { GitData } from "./useGitData";
 import { StrategyRecommendation } from "../utils/strategies";
@@ -44,7 +39,12 @@ export function usePRForm({
   const [titleExtension, setTitleExtension] = useState("");
   const [description, setDescription] = useState("");
   const [reviewers, setReviewers] = useState<string[]>([]);
-  const [openPrInBrowser, setOpenPrInBrowser] = useState(true);
+
+  const prefs = getPreferenceValues<{ openPrInBrowser: boolean }>();
+  const [openPrInBrowser, setOpenPrInBrowser] = useCachedState(
+    "openPrInBrowser",
+    prefs.openPrInBrowser,
+  );
 
   // --- UI/Search States ---
   const [targetSearchText, setTargetSearchText] = useState("");
@@ -60,20 +60,6 @@ export function usePRForm({
     isDescriptionDirty.current = false;
     setDescription("");
   }, [selectedRepoPath]);
-
-  // Load persistence state
-  useEffect(() => {
-    const loadPersistence = async () => {
-      const persisted = await LocalStorage.getItem<boolean>("openPrInBrowser");
-      if (persisted !== undefined) {
-        setOpenPrInBrowser(persisted);
-      } else {
-        const prefs = getPreferenceValues<{ openPrInBrowser: boolean }>();
-        setOpenPrInBrowser(prefs.openPrInBrowser);
-      }
-    };
-    loadPersistence();
-  }, []);
 
   // Sync data when repo data or recommendation changes
   useEffect(() => {
@@ -274,10 +260,7 @@ export function usePRForm({
     allTargetOptions,
     allReviewerOptions,
     openPrInBrowser,
-    setOpenPrInBrowser: async (val: boolean) => {
-      setOpenPrInBrowser(val);
-      await LocalStorage.setItem("openPrInBrowser", val);
-    },
+    setOpenPrInBrowser,
     handleSubmit,
   };
 }
