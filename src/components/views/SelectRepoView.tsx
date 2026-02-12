@@ -10,7 +10,7 @@ export function StrategyLoader({
 }: {
   selectedRepoPath: string;
 }) {
-  const { data, isLoading, error, saveReviewers } =
+  const { data, isLoading, error, saveReviewers, refresh } =
     useGitData(selectedRepoPath);
   const [hasSkippedReviewers, setHasSkippedReviewers] = useState(false);
 
@@ -25,7 +25,7 @@ export function StrategyLoader({
 ${error || (data as any)?.error || "Failed to load git data."}`}
         actions={
           <ActionPanel>
-            <Action title="Try Again" onAction={() => {}} />
+            <Action title="Refresh" onAction={() => refresh()} />
           </ActionPanel>
         }
       />
