@@ -12,7 +12,10 @@ from .github import check_existing_pr, create_pr, get_contributors, get_current_
 from .ui import select_from_list, get_multiline_input, prompt_reviewers
 from .config import load_config, save_config
 from .naming import parse_branch_name
-from .strategy import prompt_strategy, resolve_placeholder_targets
+from .strategy import (
+    prompt_strategy, resolve_placeholder_targets, 
+    STAGING_PATTERN, ALPHA_PATTERN, BETA_PATTERN
+)
 from .templates import PR_TEMPLATE
 
 def print_header(
@@ -196,13 +199,14 @@ def run_interactive() -> None:
         if res.get("url"):
             print_colored(f"Created: {res['url']}", "green")
 
-def output_git_data() -> None:
+def output_git_data(fetch: bool = False) -> None:
     """Output git/github metadata in JSON for Raycast."""
     if not is_git_repo():
         sys.stdout.write(json.dumps({"error": "Not a git repository."}) + "\n")
         return
 
-    fetch_latest_branches()
+    if fetch:
+        fetch_latest_branches()
     current_branch = get_current_branch()
     remote_branches = get_remote_branches()
     contributors = get_contributors()
@@ -211,13 +215,87 @@ def output_git_data() -> None:
     config = load_config()
     personalized_reviewers = config.get("personalized_reviewers", [])
 
+    # Calculate stages (matching TS logic but centralizing here)
+    import re
+    stages = []
+    
+    # Release Stages
+    rb_list = [b for b in remote_branches if re.match(STAGING_PATTERN, b)]
+    ab_list = [b for b in remote_branches if re.match(ALPHA_PATTERN, b)]
+    bb_list = [b for b in remote_branches if re.match(BETA_PATTERN, b)]
+
+    for rb in rb_list:
+        stages.append({
+            "title": f"Feature -> Develop & {rb}",
+            "recommendation": {"name": "Release: Feature", "source": current_branch, "targets": ["develop", rb]}
+        })
+    
+    if not rb_list:
+        stages.append({
+            "title": "Feature -> Develop (No release branch)",
+            "recommendation": {"name": "Release: Feature", "source": current_branch, "targets": ["develop"]}
+        })
+
+    for rb in rb_list:
+        stages.append({
+            "title": f"{rb} -> {rb}-a (Alpha)",
+            "recommendation": {"name": "Release: Staging->Alpha", "source": rb, "targets": [f"{rb}-a"]}
+        })
+
+    for ab in ab_list:
+        stages.append({
+            "title": f"{ab} -> {ab.replace('-a', '-b')} (Beta)",
+            "recommendation": {"name": "Release: Alpha->Beta", "source": ab, "targets": [ab.replace("-a", "-b")]}
+        })
+
+    live_branch = "main" if "main" in remote_branches else ("master" if "master" in remote_branches else "main")
+    for bb in bb_list:
+        stages.append({
+            "title": f"{bb} -> {live_branch} (Live)",
+            "recommendation": {"name": "Release: Beta->Live", "source": bb, "targets": [live_branch]}
+        })
+
+    # Hotfix Stages
+    hf_list = [b for b in remote_branches if b.startswith("hotfix/")]
+    for ch in [b for b in hf_list if "-" in b.replace("hotfix/", "")]:
+        parent = ch.split("-")[0]
+        stages.append({
+            "title": f"{ch} -> {parent}",
+            "recommendation": {"name": "Hotfix: Child", "source": ch, "targets": [parent]}
+        })
+    
+    # Pre-calculate latest branches once for all parent hotfixes
+    try:
+        from natsort import natsorted
+        sorted_remote = natsorted(remote_branches, reverse=True)
+    except ImportError:
+        sorted_remote = sorted(remote_branches, reverse=True)
+        
+    latest_rb = next((b for b in sorted_remote if re.match(STAGING_PATTERN, b)), None)
+    latest_ab = next((b for b in sorted_remote if re.match(ALPHA_PATTERN, b)), None)
+    latest_bb = next((b for b in sorted_remote if re.match(BETA_PATTERN, b)), None)
+    
+    propagate_targets = ["develop"]
+    if latest_rb: propagate_targets.append(latest_rb)
+    if latest_ab: propagate_targets.append(latest_ab)
+    if latest_bb: propagate_targets.append(latest_bb)
+    propagate_targets.append(live_branch)
+    propagate_targets = list(dict.fromkeys(propagate_targets))
+
+    for ph in [b for b in hf_list if "-" not in b.replace("hotfix/", "")]:
+        stages.append({
+            "title": f"{ph} -> All Branches (Propagate)",
+            "recommendation": {"name": "Hotfix: Parent->All", "source": ph, "targets": propagate_targets}
+        })
+
     data = {
         "currentBranch": current_branch,
         "remoteBranches": remote_branches,
         "contributors": contributors,
         "suggestedTickets": tickets_auto,
         "suggestedTitle": title_auto,
-        "personalizedReviewers": personalized_reviewers
+        "personalizedReviewers": personalized_reviewers,
+        "stages": stages
     }
     sys.stdout.write(json.dumps(data) + "\n")
 
@@ -296,6 +374,7 @@ def main() -> None:
     parser.add_argument("--get-description", action="store_true")
     parser.add_argument("--get-preview", action="store_true")
     parser.add_argument("--save-reviewers", action="store_true")
+    parser.add_argument("--fetch", action="store_true", help="Fetch latest branches from remote")
     
     parser.add_argument("--source")
     parser.add_argument("--target", action="append")
@@ -316,7 +395,7 @@ def main() -> None:
             sys.exit(1)
 
     if args.get_data:
-        output_git_data()
+        output_git_data(fetch=args.fetch)
     elif args.get_description:
         if not args.target or not args.source:
              sys.stdout.write(json.dumps({"error": "Source/Target required"}) + "\n")

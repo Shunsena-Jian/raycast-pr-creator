@@ -69,7 +69,7 @@ def resolve_handle(git_identity: str, interactive: bool = True) -> str:
 def create_pr(source: str, target: str, title: str, body: str, reviewers: list[str] = None, skip_confirm: bool = False) -> dict:
     """
     Constructs and executes the gh pr create command.
-    Returns a dict with 'url' and/or 'error'.
+    Returns a dict with 'url', 'error', and 'warnings'.
     """
     if not shutil.which("gh"):
         return {"error": "gh CLI not found"}
@@ -82,23 +82,26 @@ def create_pr(source: str, target: str, title: str, body: str, reviewers: list[s
         "--body", body
     ]
     
+    warnings = []
     if reviewers:
          for r in reviewers:
             handle = resolve_handle(r, interactive=not skip_confirm)
             if handle:
                 cmd.extend(["--reviewer", handle])
+            else:
+                warnings.append(f"Could not resolve GitHub handle for: {r}")
 
     try:
         # Use capture=True and check=True. If error, it raises CalledProcessError.
         result = run_cmd(cmd, capture=True)
         pr_url = result.stdout.strip()
-        return {"url": pr_url}
+        return {"url": pr_url, "warnings": warnings}
     except subprocess.CalledProcessError as e:
         error_msg = e.stderr.strip() or e.stdout.strip() or f"Exit code {e.returncode}"
         print_colored(f"GH Error: {error_msg}", "red")
-        return {"error": error_msg}
+        return {"error": error_msg, "warnings": warnings}
     except Exception as e:
-        return {"error": str(e)}
+        return {"error": str(e), "warnings": warnings}
 
 def get_contributors() -> list[str]:
     """Fetch list of contributors from GitHub API."""
