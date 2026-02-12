@@ -4,12 +4,7 @@ import { useGitData, GitData } from "../../hooks/useGitData";
 import { useRepos } from "../../hooks/useRepos";
 import { usePRPreview } from "../../hooks/usePRPreview";
 import { usePRForm } from "../../hooks/usePRForm";
-import {
-  getReleaseStages,
-  getChildHotfixStages,
-  getParentHotfixStages,
-  StrategyRecommendation,
-} from "../../utils/strategies";
+import { StrategyRecommendation } from "../../utils/strategies";
 
 interface PRFormViewProps {
   data: GitData;
@@ -45,23 +40,15 @@ export function PRFormView({
   );
 
   const allStages = useMemo(() => {
-    if (!currentData) return [];
+    if (!currentData?.stages) return [];
     if (strategyType === "release")
-      return getReleaseStages(
-        currentData.currentBranch,
-        currentData.remoteBranches,
+      return currentData.stages.filter((s) =>
+        s.recommendation.name.startsWith("Release"),
       );
     if (strategyType === "hotfix") {
-      return [
-        ...getChildHotfixStages(
-          currentData.currentBranch,
-          currentData.remoteBranches,
-        ),
-        ...getParentHotfixStages(
-          currentData.currentBranch,
-          currentData.remoteBranches,
-        ),
-      ];
+      return currentData.stages.filter((s) =>
+        s.recommendation.name.startsWith("Hotfix"),
+      );
     }
     return [];
   }, [currentData, strategyType]);
