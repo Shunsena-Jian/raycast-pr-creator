@@ -1,6 +1,15 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { runPythonScript } from "../utils/shell";
 import { showToast, Toast } from "@raycast/api";
+
+export interface GitStage {
+  title: string;
+  recommendation: {
+    name: string;
+    source: string;
+    targets: string[];
+  };
+}
 
 export interface GitData {
   currentBranch: string;
@@ -9,6 +18,7 @@ export interface GitData {
   suggestedTickets: string[];
   suggestedTitle: string;
   personalizedReviewers: string[];
+  stages: GitStage[];
   error?: string;
 }
 
@@ -17,23 +27,19 @@ export function useGitData(repoPath?: string) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let isMounted = true;
+  const fetchData = useCallback(
+    async (fetchRemote = false) => {
+      if (!repoPath) return;
 
-    async function fetchData() {
-      if (!repoPath) {
-        if (isMounted) setIsLoading(false);
-        return;
-      }
-
-      if (isMounted) {
-        setIsLoading(true);
-        setError(null);
-      }
+      setIsLoading(true);
+      setError(null);
 
       try {
-        const result = await runPythonScript(["--get-data"], repoPath);
-        if (!isMounted) return;
+        const args = ["--get-data"];
+        if (fetchRemote) {
+          args.push("--fetch");
+        }
+        const result = await runPythonScript(args, repoPath);
 
         if (result.error) {
           setError(result.error);
@@ -41,7 +47,6 @@ export function useGitData(repoPath?: string) {
           setData(result as GitData);
         }
       } catch (err) {
-        if (!isMounted) return;
         const errorMessage = String(err);
         setError(errorMessage);
         showToast({
@@ -50,15 +55,15 @@ export function useGitData(repoPath?: string) {
           message: errorMessage,
         });
       } finally {
-        if (isMounted) setIsLoading(false);
+        setIsLoading(false);
       }
-    }
+    },
+    [repoPath],
+  );
 
-    fetchData();
-    return () => {
-      isMounted = false;
-    };
-  }, [repoPath]);
+  useEffect(() => {
+    fetchData(false); // Initial load: no fetch for speed
+  }, [fetchData]);
 
   const saveReviewers = async (reviewers: string[]) => {
     if (!repoPath) return false;
@@ -67,9 +72,15 @@ export function useGitData(repoPath?: string) {
       reviewers.forEach((r) => args.push("--reviewers", r));
       const result = await runPythonScript(args, repoPath);
       if (result.success) {
-        // Refresh data
-        const freshData = await runPythonScript(["--get-data"], repoPath);
-        setData(freshData as GitData);
+        // Update state locally instead of full re-fetch
+        setData((prev) =>
+          prev
+            ? {
+              ...prev,
+              personalizedReviewers: reviewers,
+            }
+            : null,
+        );
         return true;
       }
       return false;
@@ -79,5 +90,5 @@ export function useGitData(repoPath?: string) {
     }
   };
 
-  return { data, isLoading, error, saveReviewers };
+  return { data, isLoading, error, saveReviewers, refresh: () => fetchData(true) };
 }

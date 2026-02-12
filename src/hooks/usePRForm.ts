@@ -164,10 +164,14 @@ export function usePRForm({
           const failedResults = result.results.filter((r: any) => r.error);
           const skippedResults = result.results.filter((r: any) => r.skipped);
 
+          const allWarnings = result.results.flatMap(
+            (r: any) => r.warnings || [],
+          );
+
           if (successResults.length > 0) {
             toast.style = Toast.Style.Success;
             toast.title = "PR(s) created successfully!";
-            toast.message = `Created ${successResults.length} PR(s)`;
+            toast.message = `Created ${successResults.length} PR(s)${allWarnings.length > 0 ? `\n\nWarnings:\n${allWarnings.join("\n")}` : ""}`;
 
             if (openPrInBrowser) {
               successResults.forEach((r: any) => open(r.url));
