@@ -9,7 +9,9 @@
 
 type ExtensionPreferences = {
   /** Projects Directory - The directory where your git repositories are located */
-  "projectsDirectory": string
+  "projectsDirectory": string,
+  /** Open PR in Browser - Automatically open the pull request in your browser after creation */
+  "openPrInBrowser": boolean
 }
 
 /** Preferences accessible in all the extension's commands */

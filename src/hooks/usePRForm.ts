@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
-import { showToast, Toast, open } from "@raycast/api";
+import { showToast, Toast, open, getPreferenceValues } from "@raycast/api";
+import { useCachedState } from "@raycast/utils";
 import { runPythonScript } from "../utils/shell";
 import { GitData } from "./useGitData";
 import { StrategyRecommendation } from "../utils/strategies";
@@ -11,6 +12,7 @@ export interface PRFormValues {
   titleExtension: string;
   description: string;
   reviewers: string[];
+  openPrInBrowser: boolean;
 }
 
 interface UsePRFormProps {
@@ -37,6 +39,12 @@ export function usePRForm({
   const [titleExtension, setTitleExtension] = useState("");
   const [description, setDescription] = useState("");
   const [reviewers, setReviewers] = useState<string[]>([]);
+
+  const prefs = getPreferenceValues<{ openPrInBrowser: boolean }>();
+  const [openPrInBrowser, setOpenPrInBrowser] = useCachedState(
+    "openPrInBrowser",
+    prefs.openPrInBrowser,
+  );
 
   // --- UI/Search States ---
   const [targetSearchText, setTargetSearchText] = useState("");
@@ -160,7 +168,10 @@ export function usePRForm({
             toast.style = Toast.Style.Success;
             toast.title = "PR(s) created successfully!";
             toast.message = `Created ${successResults.length} PR(s)`;
-            successResults.forEach((r: any) => open(r.url));
+
+            if (openPrInBrowser) {
+              successResults.forEach((r: any) => open(r.url));
+            }
 
             toast.primaryAction = {
               title: "Open PRs",
@@ -198,7 +209,7 @@ export function usePRForm({
         toast.message = String(error);
       }
     },
-    [selectedRepoPath, data, setPreview],
+    [selectedRepoPath, data, setPreview, openPrInBrowser],
   );
 
   // --- Derived State ---
@@ -248,6 +259,8 @@ export function usePRForm({
     allSourceOptions,
     allTargetOptions,
     allReviewerOptions,
+    openPrInBrowser,
+    setOpenPrInBrowser,
     handleSubmit,
   };
 }
