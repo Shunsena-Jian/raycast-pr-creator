@@ -1,5 +1,11 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
-import { showToast, Toast, open } from "@raycast/api";
+import {
+  showToast,
+  Toast,
+  open,
+  getPreferenceValues,
+  LocalStorage,
+} from "@raycast/api";
 import { runPythonScript } from "../utils/shell";
 import { GitData } from "./useGitData";
 import { StrategyRecommendation } from "../utils/strategies";
@@ -11,6 +17,7 @@ export interface PRFormValues {
   titleExtension: string;
   description: string;
   reviewers: string[];
+  openPrInBrowser: boolean;
 }
 
 interface UsePRFormProps {
@@ -37,6 +44,7 @@ export function usePRForm({
   const [titleExtension, setTitleExtension] = useState("");
   const [description, setDescription] = useState("");
   const [reviewers, setReviewers] = useState<string[]>([]);
+  const [openPrInBrowser, setOpenPrInBrowser] = useState(true);
 
   // --- UI/Search States ---
   const [targetSearchText, setTargetSearchText] = useState("");
@@ -52,6 +60,20 @@ export function usePRForm({
     isDescriptionDirty.current = false;
     setDescription("");
   }, [selectedRepoPath]);
+
+  // Load persistence state
+  useEffect(() => {
+    const loadPersistence = async () => {
+      const persisted = await LocalStorage.getItem<boolean>("openPrInBrowser");
+      if (persisted !== undefined) {
+        setOpenPrInBrowser(persisted);
+      } else {
+        const prefs = getPreferenceValues<{ openPrInBrowser: boolean }>();
+        setOpenPrInBrowser(prefs.openPrInBrowser);
+      }
+    };
+    loadPersistence();
+  }, []);
 
   // Sync data when repo data or recommendation changes
   useEffect(() => {
@@ -160,7 +182,10 @@ export function usePRForm({
             toast.style = Toast.Style.Success;
             toast.title = "PR(s) created successfully!";
             toast.message = `Created ${successResults.length} PR(s)`;
-            successResults.forEach((r: any) => open(r.url));
+
+            if (openPrInBrowser) {
+              successResults.forEach((r: any) => open(r.url));
+            }
 
             toast.primaryAction = {
               title: "Open PRs",
@@ -198,7 +223,7 @@ export function usePRForm({
         toast.message = String(error);
       }
     },
-    [selectedRepoPath, data, setPreview],
+    [selectedRepoPath, data, setPreview, openPrInBrowser],
   );
 
   // --- Derived State ---
@@ -248,6 +273,11 @@ export function usePRForm({
     allSourceOptions,
     allTargetOptions,
     allReviewerOptions,
+    openPrInBrowser,
+    setOpenPrInBrowser: async (val: boolean) => {
+      setOpenPrInBrowser(val);
+      await LocalStorage.setItem("openPrInBrowser", val);
+    },
     handleSubmit,
   };
 }

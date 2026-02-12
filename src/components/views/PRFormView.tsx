@@ -285,6 +285,14 @@ export function PRFormView({
           )}
       </Form.TagPicker>
 
+      <Form.Checkbox
+        id="openPrInBrowser"
+        label="Open PR in Browser after creation"
+        title="Settings"
+        value={form.openPrInBrowser}
+        onChange={form.setOpenPrInBrowser}
+      />
+
       {preview && (
         <>
           <Form.Separator />

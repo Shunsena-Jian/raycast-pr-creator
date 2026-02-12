@@ -28,7 +28,7 @@ export function getReleaseStages(
   const betaBranches = remoteBranches.filter((b) => BETA_REGEX.test(b));
 
   const stages: Stage[] = [];
-// ... (rest of the function remains similar)
+  // ... (rest of the function remains similar)
 
   // 1. Feature/Bugfix -> Develop & Staging
   releaseBranches.forEach((rb) => {
@@ -143,7 +143,8 @@ export function getParentHotfixStages(
     const alphaBranch = sortedBranches.find((b) => ALPHA_REGEX.test(b));
     const betaBranch = sortedBranches.find((b) => BETA_REGEX.test(b));
 
-    const targets = ["develop"];    if (releaseBranch) targets.push(releaseBranch);
+    const targets = ["develop"];
+    if (releaseBranch) targets.push(releaseBranch);
     if (alphaBranch) targets.push(alphaBranch);
     if (betaBranch) targets.push(betaBranch);
 

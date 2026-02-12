@@ -28,6 +28,15 @@
             "description": "The directory where your git repositories are located",
             "type": "directory",
             "required": true
+        },
+        {
+            "name": "openPrInBrowser",
+            "title": "Open PR in Browser",
+            "description": "Automatically open the pull request in your browser after creation",
+            "type": "checkbox",
+            "label": "Open in Browser",
+            "default": true,
+            "required": false
         }
     ],
     "dependencies": {

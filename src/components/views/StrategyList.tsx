@@ -11,7 +11,10 @@ interface StrategyListProps {
   selectedRepoPath: string;
 }
 
-export function StrategyList({ data: initialData, selectedRepoPath }: StrategyListProps) {
+export function StrategyList({
+  data: initialData,
+  selectedRepoPath,
+}: StrategyListProps) {
   const { push, pop } = useNavigation();
   const { data, saveReviewers } = useGitData(selectedRepoPath);
 

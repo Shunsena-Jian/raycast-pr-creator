@@ -17,7 +17,9 @@ export function SelectRepo({ onSelect }: SelectRepoProps) {
   const { repos, isLoading } = useRepos();
 
   if (isLoading) {
-    return <List isLoading={true} searchBarPlaceholder="Loading repositories..." />;
+    return (
+      <List isLoading={true} searchBarPlaceholder="Loading repositories..." />
+    );
   }
 
   if (repos.length === 0) {
