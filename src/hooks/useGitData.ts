@@ -76,9 +76,9 @@ export function useGitData(repoPath?: string) {
         setData((prev) =>
           prev
             ? {
-              ...prev,
-              personalizedReviewers: reviewers,
-            }
+                ...prev,
+                personalizedReviewers: reviewers,
+              }
             : null,
         );
         return true;
@@ -90,5 +90,11 @@ export function useGitData(repoPath?: string) {
     }
   };
 
-  return { data, isLoading, error, saveReviewers, refresh: () => fetchData(true) };
+  return {
+    data,
+    isLoading,
+    error,
+    saveReviewers,
+    refresh: () => fetchData(true),
+  };
 }

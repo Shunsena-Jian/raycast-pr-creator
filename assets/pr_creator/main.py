@@ -6,7 +6,7 @@ from typing import List, Optional, Dict, Any
 from .utils import print_colored, normalize_jira_link, extract_jira_id, clear_screen
 from .git import (
     is_git_repo, fetch_latest_branches, get_remote_branches, 
-    get_current_branch, get_commits_between, get_current_user_email
+    get_current_branch, get_commits_between, get_current_user_email, get_changed_files
 )
 from .github import check_existing_pr, create_pr, get_contributors, get_current_username
 from .ui import select_from_list, get_multiline_input, prompt_reviewers
@@ -17,6 +17,7 @@ from .strategy import (
     STAGING_PATTERN, ALPHA_PATTERN, BETA_PATTERN
 )
 from .templates import PR_TEMPLATE
+from .codeowners import get_owners_for_files
 
 def print_header(
     source: Optional[str] = None, 
@@ -365,7 +366,10 @@ def output_preview(args: argparse.Namespace) -> None:
     final_title = f"{ticket_prefix}{title_part}[{source}] -> [{target}]"
     final_body = PR_TEMPLATE.format(tickets=jira_section, description=description_base)
     
-    sys.stdout.write(json.dumps({"title": final_title, "body": final_body}) + "\n")
+    changed_files = get_changed_files(target, source)
+    suggested_reviewers = get_owners_for_files(changed_files, config.get("personalized_reviewers", []))
+
+    sys.stdout.write(json.dumps({"title": final_title, "body": final_body, "suggestedReviewers": suggested_reviewers}) + "\n")
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="QualityTrade PR Creator")

@@ -4,7 +4,8 @@ import { PRFormView } from "./PRFormView";
 import { StageList } from "./StageList";
 import { HotfixStageView } from "./HotfixStageView";
 import { ReviewerSelectionView } from "./ReviewerSelectionView";
-import { useGitData } from "../../hooks/useGitData"; import { useState, useEffect } from "react";
+import { useGitData } from "../../hooks/useGitData";
+import { useState, useEffect } from "react";
 
 interface StrategyListProps {
   data: GitData;

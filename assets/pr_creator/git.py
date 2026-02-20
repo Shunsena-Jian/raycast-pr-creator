@@ -71,6 +71,22 @@ def get_commits_between(base: str, head: str) -> list[str]:
     except subprocess.CalledProcessError:
         return []
 
+def get_changed_files(base: str, head: str) -> list[str]:
+    """Get list of files changed between base and head."""
+    try:
+        base_ref = f"origin/{base}"
+        try:
+            run_cmd(["git", "rev-parse", "--verify", base_ref], capture=True)
+        except subprocess.CalledProcessError:
+            base_ref = base
+            
+        cmd = ["git", "diff", "--name-only", f"{base_ref}...{head}"]
+        result = run_cmd(cmd, capture=True)
+        lines = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+        return lines
+    except subprocess.CalledProcessError:
+        return []
+
 def get_current_user_email() -> str:
     """Get the current git user's email."""
     try:

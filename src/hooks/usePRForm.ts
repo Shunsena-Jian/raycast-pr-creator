@@ -18,7 +18,13 @@ export interface PRFormValues {
 interface UsePRFormProps {
   selectedRepoPath: string | null;
   data: GitData | null;
-  setPreview: (preview: { title: string; body: string } | null) => void;
+  setPreview: (
+    preview: {
+      title: string;
+      body: string;
+      suggestedReviewers?: string[];
+    } | null,
+  ) => void;
   recommendation?: StrategyRecommendation | null;
 }
 
@@ -28,6 +34,32 @@ export function usePRForm({
   setPreview,
   recommendation,
 }: UsePRFormProps) {
+  // Wrap setPreview to sniff suggestedReviewers
+  const interceptSetPreview = useCallback(
+    (
+      preview: {
+        title: string;
+        body: string;
+        suggestedReviewers?: string[];
+      } | null,
+    ) => {
+      setPreview(preview);
+      if (
+        preview?.suggestedReviewers &&
+        preview.suggestedReviewers.length > 0
+      ) {
+        setReviewers((prev) => {
+          const newSet = new Set([
+            ...prev,
+            ...(preview.suggestedReviewers || []),
+          ]);
+          return Array.from(newSet);
+        });
+      }
+    },
+    [setPreview],
+  );
+
   // --- Form States ---
   const [sourceBranch, setSourceBranch] = useState(
     recommendation?.source || "",
@@ -266,5 +298,6 @@ export function usePRForm({
     openPrInBrowser,
     setOpenPrInBrowser,
     handleSubmit,
+    interceptSetPreview,
   };
 }

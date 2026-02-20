@@ -59,6 +59,7 @@ export function PRFormView({
   const [preview, setPreview] = useState<{
     title: string;
     body: string;
+    suggestedReviewers?: string[];
   } | null>(null);
 
   // If we are switching repos and loading, pass null or a safe fallback to usePRForm.
@@ -80,7 +81,7 @@ export function PRFormView({
     jiraDetails: form.jiraDetails,
     titleExtension: form.titleExtension,
     description: form.description,
-    setPreview,
+    setPreview: form.interceptSetPreview,
   });
 
   // If we're fetching new data (shouldFetch) and it's not ready yet, show loading
@@ -159,7 +160,7 @@ export function PRFormView({
                 s.recommendation.name === recommendation?.name &&
                 s.recommendation.source === recommendation?.source &&
                 JSON.stringify(s.recommendation.targets) ===
-                JSON.stringify(recommendation?.targets),
+                  JSON.stringify(recommendation?.targets),
             )?.title || ""
           }
           onChange={(val) => {
@@ -168,11 +169,7 @@ export function PRFormView({
           }}
         >
           {allStages.map((s) => (
-            <Form.Dropdown.Item
-              key={s.title}
-              value={s.title}
-              title={s.title}
-            />
+            <Form.Dropdown.Item key={s.title} value={s.title} title={s.title} />
           ))}
           {allStages.length === 0 && (
             <Form.Dropdown.Item value="" title="No stages available" />
