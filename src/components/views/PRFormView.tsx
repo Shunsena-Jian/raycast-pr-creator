@@ -160,7 +160,7 @@ export function PRFormView({
                 s.recommendation.name === recommendation?.name &&
                 s.recommendation.source === recommendation?.source &&
                 JSON.stringify(s.recommendation.targets) ===
-                  JSON.stringify(recommendation?.targets),
+                JSON.stringify(recommendation?.targets),
             )?.title || ""
           }
           onChange={(val) => {
@@ -278,9 +278,16 @@ export function PRFormView({
       </Form.TagPicker>
 
       <Form.Checkbox
+        id="isDraft"
+        label="Create as Draft"
+        title="Settings"
+        value={form.isDraft}
+        onChange={form.setIsDraft}
+      />
+
+      <Form.Checkbox
         id="openPrInBrowser"
         label="Open PR in Browser after creation"
-        title="Settings"
         value={form.openPrInBrowser}
         onChange={form.setOpenPrInBrowser}
       />

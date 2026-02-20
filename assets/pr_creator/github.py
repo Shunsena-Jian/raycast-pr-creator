@@ -66,7 +66,7 @@ def resolve_handle(git_identity: str, interactive: bool = True) -> str:
     # Note: In Raycast mode, input() will fail or hang. We should avoid it.
     return None 
 
-def create_pr(source: str, target: str, title: str, body: str, reviewers: list[str] = None, skip_confirm: bool = False) -> dict:
+def create_pr(source: str, target: str, title: str, body: str, reviewers: list[str] = None, skip_confirm: bool = False, draft: bool = False) -> dict:
     """
     Constructs and executes the gh pr create command.
     Returns a dict with 'url', 'error', and 'warnings'.
@@ -81,6 +81,9 @@ def create_pr(source: str, target: str, title: str, body: str, reviewers: list[s
         "--title", title,
         "--body", body
     ]
+    
+    if draft:
+        cmd.append("--draft")
     
     warnings = []
     if reviewers:

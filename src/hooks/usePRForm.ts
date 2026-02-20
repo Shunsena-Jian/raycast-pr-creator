@@ -13,6 +13,7 @@ export interface PRFormValues {
   description: string;
   reviewers: string[];
   openPrInBrowser: boolean;
+  isDraft: boolean;
 }
 
 interface UsePRFormProps {
@@ -77,6 +78,8 @@ export function usePRForm({
     "openPrInBrowser",
     prefs.openPrInBrowser,
   );
+
+  const [isDraft, setIsDraft] = useState(false);
 
   // --- UI/Search States ---
   const [targetSearchText, setTargetSearchText] = useState("");
@@ -175,6 +178,7 @@ export function usePRForm({
 
         if (values.titleExtension) args.push("--title", values.titleExtension);
         if (values.description) args.push("--body", values.description);
+        if (values.isDraft) args.push("--draft");
 
         const tickets = values.jiraDetails
           .split(/[\n,]/)
@@ -222,6 +226,7 @@ export function usePRForm({
             setDescription("");
             setReviewers([]);
             setPreview(null);
+            setIsDraft(false);
             isDescriptionDirty.current = false;
           } else if (failedResults.length > 0) {
             toast.style = Toast.Style.Failure;
@@ -297,6 +302,8 @@ export function usePRForm({
     allReviewerOptions,
     openPrInBrowser,
     setOpenPrInBrowser,
+    isDraft,
+    setIsDraft,
     handleSubmit,
     interceptSetPreview,
   };

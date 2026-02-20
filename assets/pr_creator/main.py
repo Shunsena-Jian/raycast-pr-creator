@@ -339,7 +339,7 @@ def run_headless(args: argparse.Namespace) -> None:
             results.append({"target": target, "skipped": True, "reason": "PR already exists"})
             continue
             
-        res = create_pr(source, target, final_title, body, reviewers, skip_confirm=True)
+        res = create_pr(source, target, final_title, body, reviewers, skip_confirm=True, draft=args.draft)
         results.append({"target": target, "url": res.get("url"), "error": res.get("error")})
     
     sys.stdout.write(json.dumps({"success": True, "results": results}) + "\n")
@@ -379,6 +379,7 @@ def main() -> None:
     parser.add_argument("--get-preview", action="store_true")
     parser.add_argument("--save-reviewers", action="store_true")
     parser.add_argument("--fetch", action="store_true", help="Fetch latest branches from remote")
+    parser.add_argument("--draft", action="store_true", help="Create PR as draft")
     
     parser.add_argument("--source")
     parser.add_argument("--target", action="append")
