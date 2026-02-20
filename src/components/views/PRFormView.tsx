@@ -153,16 +153,24 @@ export function PRFormView({
         <Form.Dropdown
           id="stage"
           title="Stage"
-          value={recommendation?.name || ""}
+          value={
+            allStages.find(
+              (s) =>
+                s.recommendation.name === recommendation?.name &&
+                s.recommendation.source === recommendation?.source &&
+                JSON.stringify(s.recommendation.targets) ===
+                JSON.stringify(recommendation?.targets),
+            )?.title || ""
+          }
           onChange={(val) => {
-            const stage = allStages.find((s) => s.recommendation.name === val);
+            const stage = allStages.find((s) => s.title === val);
             if (stage) setRecommendation(stage.recommendation);
           }}
         >
           {allStages.map((s) => (
             <Form.Dropdown.Item
-              key={s.recommendation.name}
-              value={s.recommendation.name}
+              key={s.title}
+              value={s.title}
               title={s.title}
             />
           ))}
