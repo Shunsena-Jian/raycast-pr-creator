@@ -4,7 +4,13 @@ import { useGitData, GitData } from "../../hooks/useGitData";
 import { useRepos } from "../../hooks/useRepos";
 import { usePRPreview } from "../../hooks/usePRPreview";
 import { usePRForm } from "../../hooks/usePRForm";
-import { StrategyRecommendation } from "../../utils/strategies";
+import {
+  StrategyRecommendation,
+  getReleaseStages,
+  getChildHotfixStages,
+  getParentHotfixStages,
+  Stage,
+} from "../../utils/strategies";
 
 interface PRFormViewProps {
   data: GitData;
@@ -40,15 +46,24 @@ export function PRFormView({
   );
 
   const allStages = useMemo(() => {
-    if (!currentData?.stages) return [];
-    if (strategyType === "release")
-      return currentData.stages.filter((s) =>
-        s.recommendation.name.startsWith("Release"),
+    if (!currentData) return [];
+    if (strategyType === "release") {
+      return getReleaseStages(
+        currentData.currentBranch,
+        currentData.remoteBranches,
       );
+    }
     if (strategyType === "hotfix") {
-      return currentData.stages.filter((s) =>
-        s.recommendation.name.startsWith("Hotfix"),
-      );
+      return [
+        ...getChildHotfixStages(
+          currentData.currentBranch,
+          currentData.remoteBranches,
+        ),
+        ...getParentHotfixStages(
+          currentData.currentBranch,
+          currentData.remoteBranches,
+        ),
+      ];
     }
     return [];
   }, [currentData, strategyType]);
@@ -155,11 +170,13 @@ export function PRFormView({
           title="Stage"
           value={recommendation?.name || ""}
           onChange={(val) => {
-            const stage = allStages.find((s) => s.recommendation.name === val);
+            const stage = allStages.find(
+              (s: Stage) => s.recommendation.name === val,
+            );
             if (stage) setRecommendation(stage.recommendation);
           }}
         >
-          {allStages.map((s) => (
+          {allStages.map((s: Stage) => (
             <Form.Dropdown.Item
               key={s.recommendation.name}
               value={s.recommendation.name}

@@ -16,12 +16,13 @@ export function StrategyList({
   selectedRepoPath,
 }: StrategyListProps) {
   const { push, pop } = useNavigation();
-  const { data, saveReviewers } = useGitData(selectedRepoPath);
+  const { data, saveReviewers, isLoading, refresh } =
+    useGitData(selectedRepoPath);
 
   const currentData = data || initialData;
 
   return (
-    <List navigationTitle="Select Strategy">
+    <List navigationTitle="Select Strategy" isLoading={isLoading}>
       <List.Item
         title="Release Strategy"
         icon={Icon.Rocket}
@@ -38,6 +39,12 @@ export function StrategyList({
                   />,
                 )
               }
+            />
+            <Action
+              title="Refresh Git Data (fetch)"
+              icon={Icon.ArrowClockwise}
+              onAction={refresh}
+              shortcut={{ modifiers: ["cmd"], key: "r" }}
             />
             <Action
               title="Configure Reviewers"
@@ -81,6 +88,12 @@ export function StrategyList({
               }
             />
             <Action
+              title="Refresh Git Data (fetch)"
+              icon={Icon.ArrowClockwise}
+              onAction={refresh}
+              shortcut={{ modifiers: ["cmd"], key: "r" }}
+            />
+            <Action
               title="Change Repository"
               icon={Icon.Switch}
               onAction={() => pop()}
@@ -104,6 +117,12 @@ export function StrategyList({
                   />,
                 )
               }
+            />
+            <Action
+              title="Refresh Git Data (fetch)"
+              icon={Icon.ArrowClockwise}
+              onAction={refresh}
+              shortcut={{ modifiers: ["cmd"], key: "r" }}
             />
             <Action
               title="Change Repository"
