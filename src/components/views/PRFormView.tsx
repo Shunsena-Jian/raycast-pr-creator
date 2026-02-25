@@ -151,16 +151,31 @@ export function PRFormView({
         title="Strategy"
         value={strategyType}
         onChange={(val) => {
-          setStrategyType(val as any);
-          if (val === "manual") setRecommendation(null);
+          const newType = val as "manual" | "release" | "hotfix";
+          setStrategyType(newType);
+
+          if (newType === "manual") {
+            setRecommendation(null);
+          } else if (currentData) {
+            // Auto-select the first stage for the new strategy
+            let stages: Stage[] = [];
+            if (newType === "release") {
+              stages = getReleaseStages(currentData.currentBranch, currentData.remoteBranches);
+            } else if (newType === "hotfix") {
+              stages = [
+                ...getChildHotfixStages(currentData.currentBranch, currentData.remoteBranches),
+                ...getParentHotfixStages(currentData.currentBranch, currentData.remoteBranches),
+              ];
+            }
+
+            if (stages.length > 0) {
+              setRecommendation(stages[0].recommendation);
+            }
+          }
         }}
       >
         <Form.Dropdown.Item value="manual" title="Manual" icon={Icon.Plus} />
-        <Form.Dropdown.Item
-          value="release"
-          title="Release"
-          icon={Icon.Rocket}
-        />
+        <Form.Dropdown.Item value="release" title="Release" icon={Icon.Rocket} />
         <Form.Dropdown.Item value="hotfix" title="Hotfix" icon={Icon.Hammer} />
       </Form.Dropdown>
 
