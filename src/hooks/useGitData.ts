@@ -2,15 +2,6 @@ import { useState, useEffect, useCallback } from "react";
 import { runPythonScript } from "../utils/shell";
 import { showToast, Toast } from "@raycast/api";
 
-export interface GitStage {
-  title: string;
-  recommendation: {
-    name: string;
-    source: string;
-    targets: string[];
-  };
-}
-
 export interface GitData {
   currentBranch: string;
   remoteBranches: string[];
@@ -18,7 +9,6 @@ export interface GitData {
   suggestedTickets: string[];
   suggestedTitle: string;
   personalizedReviewers: string[];
-  stages: GitStage[];
   error?: string;
 }
 

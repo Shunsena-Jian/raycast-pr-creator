@@ -4,7 +4,13 @@ import { useGitData, GitData } from "../../hooks/useGitData";
 import { useRepos } from "../../hooks/useRepos";
 import { usePRPreview } from "../../hooks/usePRPreview";
 import { usePRForm } from "../../hooks/usePRForm";
-import { StrategyRecommendation } from "../../utils/strategies";
+import {
+  StrategyRecommendation,
+  getReleaseStages,
+  getChildHotfixStages,
+  getParentHotfixStages,
+  Stage,
+} from "../../utils/strategies";
 
 interface PRFormViewProps {
   data: GitData;
@@ -40,15 +46,24 @@ export function PRFormView({
   );
 
   const allStages = useMemo(() => {
-    if (!currentData?.stages) return [];
-    if (strategyType === "release")
-      return currentData.stages.filter((s) =>
-        s.recommendation.name.startsWith("Release"),
+    if (!currentData) return [];
+    if (strategyType === "release") {
+      return getReleaseStages(
+        currentData.currentBranch,
+        currentData.remoteBranches,
       );
+    }
     if (strategyType === "hotfix") {
-      return currentData.stages.filter((s) =>
-        s.recommendation.name.startsWith("Hotfix"),
-      );
+      return [
+        ...getChildHotfixStages(
+          currentData.currentBranch,
+          currentData.remoteBranches,
+        ),
+        ...getParentHotfixStages(
+          currentData.currentBranch,
+          currentData.remoteBranches,
+        ),
+      ];
     }
     return [];
   }, [currentData, strategyType]);
@@ -137,16 +152,31 @@ export function PRFormView({
         title="Strategy"
         value={strategyType}
         onChange={(val) => {
-          setStrategyType(val as any);
-          if (val === "manual") setRecommendation(null);
+          const newType = val as "manual" | "release" | "hotfix";
+          setStrategyType(newType);
+
+          if (newType === "manual") {
+            setRecommendation(null);
+          } else if (currentData) {
+            // Auto-select the first stage for the new strategy
+            let stages: Stage[] = [];
+            if (newType === "release") {
+              stages = getReleaseStages(currentData.currentBranch, currentData.remoteBranches);
+            } else if (newType === "hotfix") {
+              stages = [
+                ...getChildHotfixStages(currentData.currentBranch, currentData.remoteBranches),
+                ...getParentHotfixStages(currentData.currentBranch, currentData.remoteBranches),
+              ];
+            }
+
+            if (stages.length > 0) {
+              setRecommendation(stages[0].recommendation);
+            }
+          }
         }}
       >
         <Form.Dropdown.Item value="manual" title="Manual" icon={Icon.Plus} />
-        <Form.Dropdown.Item
-          value="release"
-          title="Release"
-          icon={Icon.Rocket}
-        />
+        <Form.Dropdown.Item value="release" title="Release" icon={Icon.Rocket} />
         <Form.Dropdown.Item value="hotfix" title="Hotfix" icon={Icon.Hammer} />
       </Form.Dropdown>
 
@@ -164,12 +194,18 @@ export function PRFormView({
             )?.title || ""
           }
           onChange={(val) => {
-            const stage = allStages.find((s) => s.title === val);
+            const stage = allStages.find(
+              (s: Stage) => s.recommendation.name === val,
+            );
             if (stage) setRecommendation(stage.recommendation);
           }}
         >
-          {allStages.map((s) => (
-            <Form.Dropdown.Item key={s.title} value={s.title} title={s.title} />
+          {allStages.map((s: Stage) => (
+            <Form.Dropdown.Item
+              key={s.recommendation.name}
+              value={s.recommendation.name}
+              title={s.title}
+            />
           ))}
           {allStages.length === 0 && (
             <Form.Dropdown.Item value="" title="No stages available" />
