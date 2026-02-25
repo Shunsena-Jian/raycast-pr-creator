@@ -9,9 +9,9 @@ export interface Stage {
   recommendation: StrategyRecommendation;
 }
 
-export const STAGING_REGEX = /^release\/\d+\.\d+\.\d+$/;
-export const ALPHA_REGEX = /^release\/\d+\.\d+\.\d+-a$/;
-export const BETA_REGEX = /^release\/\d+\.\d+\.\d+-b$/;
+export const STAGING_PATTERN = /release\/\d+\.\d+\.\d+$/;
+export const ALPHA_PATTERN = /release\/\d+\.\d+\.\d+-a$/;
+export const BETA_PATTERN = /release\/\d+\.\d+\.\d+-b$/;
 
 /**
  * Determines release stages based on naming conventions:
@@ -23,26 +23,30 @@ export function getReleaseStages(
   currentBranch: string,
   remoteBranches: string[],
 ): Stage[] {
-  const releaseBranches = remoteBranches.filter((b) => STAGING_REGEX.test(b));
-  const alphaBranches = remoteBranches.filter((b) => ALPHA_REGEX.test(b));
-  const betaBranches = remoteBranches.filter((b) => BETA_REGEX.test(b));
+  const releaseBranches = remoteBranches
+    .filter((b) => STAGING_PATTERN.test(b))
+    .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
+  const alphaBranches = remoteBranches
+    .filter((b) => ALPHA_PATTERN.test(b))
+    .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
+  const betaBranches = remoteBranches
+    .filter((b) => BETA_PATTERN.test(b))
+    .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
 
   const stages: Stage[] = [];
-  // ... (rest of the function remains similar)
 
-  // 1. Feature/Bugfix -> Develop & Staging
-  releaseBranches.forEach((rb) => {
+  // 1. Feature/Bugfix -> Develop & Staging (Latest staging)
+  if (releaseBranches.length > 0) {
+    const latestRB = releaseBranches[0];
     stages.push({
-      title: `Feature -> Develop & ${rb}`,
+      title: `Feature -> Develop & ${latestRB}`,
       recommendation: {
         name: "Release: Feature",
         source: currentBranch,
-        targets: ["develop", rb],
+        targets: ["develop", latestRB],
       },
     });
-  });
-
-  if (releaseBranches.length === 0) {
+  } else {
     stages.push({
       title: "Feature -> Develop (No release branch found)",
       recommendation: {
@@ -99,6 +103,32 @@ export function getReleaseStages(
 }
 
 /**
+ * Shared logic for determining standard propagation targets for parent hotfixes
+ */
+function getParentHotfixTargets(remoteBranches: string[]): string[] {
+  const sortedBranches = [...remoteBranches].sort((a, b) =>
+    b.localeCompare(a, undefined, { numeric: true }),
+  );
+  const releaseBranch = sortedBranches.find((b) => STAGING_PATTERN.test(b));
+  const alphaBranch = sortedBranches.find((b) => ALPHA_PATTERN.test(b));
+  const betaBranch = sortedBranches.find((b) => BETA_PATTERN.test(b));
+
+  const targets = ["develop"];
+  if (releaseBranch) targets.push(releaseBranch);
+  if (alphaBranch) targets.push(alphaBranch);
+  if (betaBranch) targets.push(betaBranch);
+
+  const liveBranch = remoteBranches.includes("main")
+    ? "main"
+    : remoteBranches.includes("master")
+      ? "master"
+      : "main";
+  targets.push(liveBranch);
+
+  return Array.from(new Set(targets));
+}
+
+/**
  * Determines child hotfix stages (Child -> Parent)
  */
 export function getChildHotfixStages(
@@ -110,17 +140,41 @@ export function getChildHotfixStages(
     b.replace("hotfix/", "").includes("-"),
   );
 
-  return childHotfixes.map((ch) => {
+  const stages: Stage[] = [];
+
+  // Add current branch if it's a child hotfix
+  if (
+    currentBranch.startsWith("hotfix/") &&
+    currentBranch.replace("hotfix/", "").includes("-")
+  ) {
+    const parent = currentBranch.split("-")[0];
+    stages.push({
+      title: `Current: ${currentBranch} -> ${parent}`,
+      recommendation: {
+        name: "Hotfix: Current Child",
+        source: currentBranch,
+        targets: [parent],
+      },
+    });
+  }
+
+  // Add other available child hotfixes
+  childHotfixes.forEach((ch) => {
+    // Avoid duplication if it's already added as current
+    if (ch === currentBranch) return;
+
     const parent = ch.split("-")[0];
-    return {
+    stages.push({
       title: `${ch} -> ${parent}`,
       recommendation: {
-        name: "Hotfix: Child",
+        name: `Hotfix: Child (${ch})`,
         source: ch,
         targets: [parent],
       },
-    };
+    });
   });
+
+  return stages;
 }
 
 /**
@@ -135,33 +189,38 @@ export function getParentHotfixStages(
     (b) => !b.replace("hotfix/", "").includes("-"),
   );
 
-  return parentHotfixes.map((ph) => {
-    const sortedBranches = [...remoteBranches].sort((a, b) =>
-      b.localeCompare(a, undefined, { numeric: true }),
-    );
-    const releaseBranch = sortedBranches.find((b) => STAGING_REGEX.test(b));
-    const alphaBranch = sortedBranches.find((b) => ALPHA_REGEX.test(b));
-    const betaBranch = sortedBranches.find((b) => BETA_REGEX.test(b));
+  const stages: Stage[] = [];
 
-    const targets = ["develop"];
-    if (releaseBranch) targets.push(releaseBranch);
-    if (alphaBranch) targets.push(alphaBranch);
-    if (betaBranch) targets.push(betaBranch);
+  // 1. Detect parent from current branch if it's a hotfix (child or parent)
+  if (currentBranch.startsWith("hotfix/")) {
+    const detectedParent = currentBranch.split("-")[0];
+    stages.push({
+      title: `Parent: ${detectedParent} -> All Branches (Propagate)`,
+      recommendation: {
+        name: "Hotfix: Detected Parent->All",
+        source: detectedParent,
+        targets: getParentHotfixTargets(remoteBranches),
+      },
+    });
+  }
 
-    const liveBranch = remoteBranches.includes("main")
-      ? "main"
-      : remoteBranches.includes("master")
-        ? "master"
-        : "main";
-    targets.push(liveBranch);
+  // 2. Add other available parent hotfixes
+  parentHotfixes.forEach((ph) => {
+    // Avoid duplication
+    const detectedParent = currentBranch.startsWith("hotfix/")
+      ? currentBranch.split("-")[0]
+      : null;
+    if (ph === detectedParent) return;
 
-    return {
+    stages.push({
       title: `${ph} -> All Branches (Propagate)`,
       recommendation: {
-        name: "Hotfix: Parent->All",
+        name: `Hotfix: Parent (${ph})`,
         source: ph,
-        targets: Array.from(new Set(targets)),
+        targets: getParentHotfixTargets(remoteBranches),
       },
-    };
+    });
   });
+
+  return stages;
 }
