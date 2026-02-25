@@ -6,12 +6,13 @@ from typing import List, Optional, Dict, Any
 from .utils import normalize_jira_link, extract_jira_id
 from .git import (
     is_git_repo, fetch_latest_branches, get_remote_branches, 
-    get_current_branch, get_commits_between, get_current_user_email
+    get_current_branch, get_commits_between, get_current_user_email, get_changed_files
 )
 from .github import check_existing_pr, create_pr, get_contributors, get_current_username
 from .config import load_config, save_config
 from .naming import parse_branch_name
 from .templates import PR_TEMPLATE
+from .codeowners import get_owners_for_files
 
 def output_git_data(fetch: bool = False) -> None:
     """Output git/github metadata in JSON for Raycast."""
@@ -78,7 +79,7 @@ def run_headless(args: argparse.Namespace) -> None:
             results.append({"target": target, "skipped": True, "reason": "PR already exists"})
             continue
             
-        res = create_pr(source, target, final_title, body, reviewers, skip_confirm=True)
+        res = create_pr(source, target, final_title, body, reviewers, skip_confirm=True, draft=args.draft)
         results.append({"target": target, "url": res.get("url"), "error": res.get("error")})
     
     sys.stdout.write(json.dumps({"success": True, "results": results}) + "\n")
@@ -105,7 +106,10 @@ def output_preview(args: argparse.Namespace) -> None:
     final_title = f"{ticket_prefix}{title_part}[{source}] -> [{target}]"
     final_body = PR_TEMPLATE.format(tickets=jira_section, description=description_base)
     
-    sys.stdout.write(json.dumps({"title": final_title, "body": final_body}) + "\n")
+    changed_files = get_changed_files(target, source)
+    suggested_reviewers = get_owners_for_files(changed_files, config.get("personalized_reviewers", []))
+
+    sys.stdout.write(json.dumps({"title": final_title, "body": final_body, "suggestedReviewers": suggested_reviewers}) + "\n")
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="QualityTrade PR Creator")
@@ -115,6 +119,7 @@ def main() -> None:
     parser.add_argument("--get-preview", action="store_true")
     parser.add_argument("--save-reviewers", action="store_true")
     parser.add_argument("--fetch", action="store_true", help="Fetch latest branches from remote")
+    parser.add_argument("--draft", action="store_true", help="Create PR as draft")
     
     parser.add_argument("--source")
     parser.add_argument("--target", action="append")

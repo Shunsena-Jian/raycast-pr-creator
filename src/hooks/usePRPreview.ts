@@ -8,7 +8,13 @@ interface UsePRPreviewProps {
   jiraDetails: string;
   titleExtension: string;
   description: string;
-  setPreview: (preview: { title: string; body: string } | null) => void;
+  setPreview: (
+    preview: {
+      title: string;
+      body: string;
+      suggestedReviewers?: string[];
+    } | null,
+  ) => void;
 }
 
 export function usePRPreview({

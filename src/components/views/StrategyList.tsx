@@ -5,6 +5,7 @@ import { StageList } from "./StageList";
 import { HotfixStageView } from "./HotfixStageView";
 import { ReviewerSelectionView } from "./ReviewerSelectionView";
 import { useGitData } from "../../hooks/useGitData";
+import { useState, useEffect } from "react";
 
 interface StrategyListProps {
   data: GitData;
@@ -20,6 +21,34 @@ export function StrategyList({
     useGitData(selectedRepoPath);
 
   const currentData = data || initialData;
+
+  const [hasAutoNavigated, setHasAutoNavigated] = useState(false);
+
+  useEffect(() => {
+    if (hasAutoNavigated || !currentData?.currentBranch) return;
+
+    const branch = currentData.currentBranch;
+    if (branch.startsWith("feature/") || branch.startsWith("bugfix/")) {
+      setHasAutoNavigated(true);
+      push(
+        <StageList
+          type="release"
+          data={currentData}
+          selectedRepoPath={selectedRepoPath}
+        />,
+      );
+    } else if (branch.startsWith("hotfix/")) {
+      setHasAutoNavigated(true);
+      push(
+        <HotfixStageView
+          data={currentData}
+          selectedRepoPath={selectedRepoPath}
+        />,
+      );
+    } else {
+      setHasAutoNavigated(true);
+    }
+  }, [currentData?.currentBranch, hasAutoNavigated, push]);
 
   return (
     <List navigationTitle="Select Strategy" isLoading={isLoading}>

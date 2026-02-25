@@ -74,6 +74,7 @@ export function PRFormView({
   const [preview, setPreview] = useState<{
     title: string;
     body: string;
+    suggestedReviewers?: string[];
   } | null>(null);
 
   // If we are switching repos and loading, pass null or a safe fallback to usePRForm.
@@ -95,7 +96,7 @@ export function PRFormView({
     jiraDetails: form.jiraDetails,
     titleExtension: form.titleExtension,
     description: form.description,
-    setPreview,
+    setPreview: form.interceptSetPreview,
   });
 
   // If we're fetching new data (shouldFetch) and it's not ready yet, show loading
@@ -183,7 +184,15 @@ export function PRFormView({
         <Form.Dropdown
           id="stage"
           title="Stage"
-          value={recommendation?.name || ""}
+          value={
+            allStages.find(
+              (s) =>
+                s.recommendation.name === recommendation?.name &&
+                s.recommendation.source === recommendation?.source &&
+                JSON.stringify(s.recommendation.targets) ===
+                JSON.stringify(recommendation?.targets),
+            )?.title || ""
+          }
           onChange={(val) => {
             const stage = allStages.find(
               (s: Stage) => s.recommendation.name === val,
@@ -305,9 +314,16 @@ export function PRFormView({
       </Form.TagPicker>
 
       <Form.Checkbox
+        id="isDraft"
+        label="Create as Draft"
+        title="Settings"
+        value={form.isDraft}
+        onChange={form.setIsDraft}
+      />
+
+      <Form.Checkbox
         id="openPrInBrowser"
         label="Open PR in Browser after creation"
-        title="Settings"
         value={form.openPrInBrowser}
         onChange={form.setOpenPrInBrowser}
       />
