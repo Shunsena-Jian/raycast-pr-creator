@@ -1,7 +1,7 @@
 import os
 import re
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 def parse_codeowners(content: str) -> List[tuple[str, List[str]]]:
     """Parse CODEOWNERS content into a list of (pattern, owners) tuples."""
@@ -17,7 +17,7 @@ def parse_codeowners(content: str) -> List[tuple[str, List[str]]]:
             rules.append((pattern, owners))
     return rules
 
-def get_codeowners_content() -> str | None:
+def get_codeowners_content() -> Optional[str]:
     """Check common locations for a CODEOWNERS file and read it."""
     locations = ['.github/CODEOWNERS', 'CODEOWNERS', 'docs/CODEOWNERS']
     for p in locations:
