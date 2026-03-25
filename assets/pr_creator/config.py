@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import sys
 from pathlib import Path
@@ -39,65 +40,73 @@ def load_config() -> Dict[str, Any]:
                         defaults[key] = value
                     return defaults
             except json.JSONDecodeError:
-                print(f"Warning: Failed to parse config file at {path}. Using defaults.", file=sys.stderr)
+                logging.warning(f"Failed to parse config file at {path}. Using defaults.")
     
     return defaults
 
-def save_config(config_dict: Dict[str, Any]):
+def save_config(config_dict: Dict[str, Any]) -> None:
     """
     Saves the configuration to .pr_creator_config.json in the current directory.
+
+    Args:
+        config_dict: Dictionary containing configuration values to save.
     """
     target_path = Path.cwd() / CONFIG_FILENAME
-    
+
     # Load existing to merge if necessary, or just overwrite if it's meant to be full
-    current_config = {}
+    current_config: Dict[str, Any] = {}
     if target_path.exists():
         try:
             with open(target_path, "r") as f:
                 current_config = json.load(f)
         except json.JSONDecodeError:
-            pass
-            
+            logging.warning(f"Failed to parse existing config at {target_path}. Starting fresh.")
+
     current_config.update(config_dict)
-    
+
     try:
         with open(target_path, "w") as f:
             json.dump(current_config, f, indent=4)
-        print(f"Saved configuration to {target_path}", file=sys.stderr)
+        logging.info(f"Saved configuration to {target_path}")
     except OSError as e:
-        print(f"Warning: Failed to save config: {e}", file=sys.stderr)
+        logging.warning(f"Failed to save config: {e}")
 
-def add_to_user_map(email: str, handle: str):
+def add_to_user_map(email: str, handle: str) -> None:
     """
     Updates the github_user_map in the config file.
+
     Prioritizes updating local config if it exists, otherwise home config.
     Creates home config if neither exists.
+
+    Args:
+        email: The git email address to map.
+        handle: The GitHub username to map to.
     """
     local_config = Path.cwd() / CONFIG_FILENAME
     home_config = Path.home() / CONFIG_FILENAME
-    
+
     target_path = home_config
     if local_config.exists():
         target_path = local_config
     elif home_config.exists():
         target_path = home_config
-        
-    current_config = {}
+
+    current_config: Dict[str, Any] = {}
     if target_path.exists():
         try:
             with open(target_path, "r") as f:
                 current_config = json.load(f)
         except json.JSONDecodeError:
-            pass # Start fresh if corrupt
-            
+            logging.warning(f"Failed to parse config at {target_path}. Starting fresh.")
+
     if "github_user_map" not in current_config:
         current_config["github_user_map"] = {}
-        
+
     current_config["github_user_map"][email] = handle
-    
+
     try:
         with open(target_path, "w") as f:
             json.dump(current_config, f, indent=4)
-        print(f"Saved mapping for {email} to {target_path}", file=sys.stderr)
+        logging.info(f"Saved mapping for {email} to {target_path}")
     except OSError as e:
-        print(f"Warning: Failed to save config: {e}", file=sys.stderr)
+        logging.warning(f"Failed to save config: {e}")

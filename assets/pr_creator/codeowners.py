@@ -1,3 +1,5 @@
+import fnmatch
+import logging
 import os
 import re
 from pathlib import Path
@@ -19,20 +21,18 @@ def parse_codeowners(content: str) -> List[tuple[str, List[str]]]:
 
 def get_codeowners_content() -> Optional[str]:
     """Check common locations for a CODEOWNERS file and read it."""
-    locations = ['.github/CODEOWNERS', 'CODEOWNERS', 'docs/CODEOWNERS']
+    locations = [".github/CODEOWNERS", "CODEOWNERS", "docs/CODEOWNERS"]
     for p in locations:
         if os.path.isfile(p):
             try:
-                with open(p, 'r') as f:
+                with open(p, "r") as f:
                     return f.read()
-            except Exception:
-                pass
+            except Exception as e:
+                logging.warning(f"Failed to read CODEOWNERS file at {p}: {e}")
     return None
 
 def match_pattern(path: str, pattern: str) -> bool:
     """Basic matching for CODEOWNERS patterns."""
-    import fnmatch
-    
     # Clean pattern
     orig_pattern = pattern
     

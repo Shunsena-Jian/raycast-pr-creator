@@ -12,7 +12,46 @@ export interface GitData {
   error?: string;
 }
 
-export function useGitData(repoPath?: string) {
+function isGitData(value: unknown): value is GitData {
+  if (typeof value !== "object" || value === null) return false;
+  const obj = value as Record<string, unknown>;
+  // Check for valid GitData structure - use defensive checks for arrays
+  const currentBranch = obj.currentBranch;
+  const remoteBranches = obj.remoteBranches;
+  const contributors = obj.contributors;
+  const suggestedTickets = obj.suggestedTickets;
+  const suggestedTitle = obj.suggestedTitle;
+  const personalizedReviewers = obj.personalizedReviewers;
+
+  return (
+    typeof currentBranch === "string" &&
+    Array.isArray(remoteBranches) &&
+    Array.isArray(contributors) &&
+    Array.isArray(suggestedTickets) &&
+    typeof suggestedTitle === "string" &&
+    Array.isArray(personalizedReviewers)
+  );
+}
+
+function isErrorResponse(value: unknown): value is { error: string } {
+  return typeof value === "object" && value !== null && "error" in value;
+}
+
+interface SaveReviewersResult {
+  success: boolean;
+}
+
+function isSaveReviewersResult(value: unknown): value is SaveReviewersResult {
+  return typeof value === "object" && value !== null && "success" in value;
+}
+
+export function useGitData(repoPath?: string): {
+  data: GitData | null;
+  isLoading: boolean;
+  error: string | null;
+  saveReviewers: (reviewers: string[]) => Promise<boolean>;
+  refresh: () => void;
+} {
   const [data, setData] = useState<GitData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,10 +70,12 @@ export function useGitData(repoPath?: string) {
         }
         const result = await runPythonScript(args, repoPath);
 
-        if (result.error) {
+        if (isErrorResponse(result)) {
           setError(result.error);
+        } else if (isGitData(result)) {
+          setData(result);
         } else {
-          setData(result as GitData);
+          setError("Invalid response from git data");
         }
       } catch (err) {
         const errorMessage = String(err);
@@ -55,30 +96,33 @@ export function useGitData(repoPath?: string) {
     fetchData(false); // Initial load: no fetch for speed
   }, [fetchData]);
 
-  const saveReviewers = async (reviewers: string[]) => {
-    if (!repoPath) return false;
-    try {
-      const args = ["--save-reviewers"];
-      reviewers.forEach((r) => args.push("--reviewers", r));
-      const result = await runPythonScript(args, repoPath);
-      if (result.success) {
-        // Update state locally instead of full re-fetch
-        setData((prev) =>
-          prev
-            ? {
-                ...prev,
-                personalizedReviewers: reviewers,
-              }
-            : null,
-        );
-        return true;
+  const saveReviewers = useCallback(
+    async (reviewers: string[]): Promise<boolean> => {
+      if (!repoPath) return false;
+      try {
+        const args = ["--save-reviewers"];
+        reviewers.forEach((r) => args.push("--reviewers", r));
+        const result = await runPythonScript(args, repoPath);
+        if (isSaveReviewersResult(result) && result.success) {
+          // Update state locally instead of full re-fetch
+          setData((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  personalizedReviewers: reviewers,
+                }
+              : null,
+          );
+          return true;
+        }
+        return false;
+      } catch (err) {
+        console.error("Failed to save reviewers:", err);
+        return false;
       }
-      return false;
-    } catch (err) {
-      console.error("Failed to save reviewers:", err);
-      return false;
-    }
-  };
+    },
+    [repoPath],
+  );
 
   return {
     data,

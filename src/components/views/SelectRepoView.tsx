@@ -18,11 +18,11 @@ export function StrategyLoader({
     return <Detail isLoading={true} />;
   }
 
-  if (error || (data as any)?.error) {
+  if (error || data?.error) {
     return (
       <Detail
         markdown={`# Error
-${error || (data as any)?.error || "Failed to load git data."}`}
+${error || data?.error || "Failed to load git data."}`}
         actions={
           <ActionPanel>
             <Action title="Refresh" onAction={() => refresh()} />

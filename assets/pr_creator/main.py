@@ -73,7 +73,9 @@ def run_headless(args: argparse.Namespace) -> None:
     for target in targets:
         title_part = f"[{title_base}]" if title_base else ""
         final_title = f"{ticket_prefix}{title_part}[{source}] -> [{target}]"
-        body = PR_TEMPLATE.format(tickets=jira_section, description=description)
+        body = PR_TEMPLATE.format(
+            tickets=jira_section, description=description
+        )
         
         if check_existing_pr(source, target):
             results.append({"target": target, "skipped": True, "reason": "PR already exists"})
@@ -104,7 +106,9 @@ def output_preview(args: argparse.Namespace) -> None:
     
     title_part = f"[{title_base}]" if title_base else ""
     final_title = f"{ticket_prefix}{title_part}[{source}] -> [{target}]"
-    final_body = PR_TEMPLATE.format(tickets=jira_section, description=description_base)
+    final_body = PR_TEMPLATE.format(
+        tickets=jira_section, description=description_base
+    )
     
     changed_files = get_changed_files(target, source)
     suggested_reviewers = get_owners_for_files(changed_files, config.get("personalized_reviewers", []))

@@ -30,10 +30,10 @@ function ReviewerManagementLoader({
     return <Detail isLoading={true} />;
   }
 
-  if (error || (data as any)?.error) {
+  if (error || data?.error) {
     return (
       <Detail
-        markdown={`# Error\n${error || (data as any)?.error || "Failed to load git data."}`}
+        markdown={`# Error\n${error || data?.error || "Failed to load git data."}`}
       />
     );
   }

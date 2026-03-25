@@ -29,6 +29,51 @@ interface UsePRFormProps {
   recommendation?: StrategyRecommendation | null;
 }
 
+interface SuccessResult {
+  url: string;
+  warnings?: string[];
+}
+
+interface FailedResult {
+  target: string;
+  error: string;
+}
+
+interface SkippedResult {
+  target: string;
+  reason: string;
+}
+
+function isSuccessResult(r: unknown): r is SuccessResult {
+  return typeof r === "object" && r !== null && "url" in r;
+}
+
+function isFailedResult(r: unknown): r is FailedResult {
+  return typeof r === "object" && r !== null && "error" in r && "target" in r;
+}
+
+function isSkippedResult(r: unknown): r is SkippedResult {
+  return typeof r === "object" && r !== null && "skipped" in r && "target" in r;
+}
+
+interface DescriptionResult {
+  description?: string;
+}
+
+interface PRSubmissionResult {
+  success: boolean;
+  error?: string;
+  results: (SuccessResult | FailedResult | SkippedResult)[];
+}
+
+function isDescriptionResult(value: unknown): value is DescriptionResult {
+  return typeof value === "object" && value !== null;
+}
+
+function isPRSubmissionResult(value: unknown): value is PRSubmissionResult {
+  return typeof value === "object" && value !== null && "success" in value;
+}
+
 export function usePRForm({
   selectedRepoPath,
   data,
@@ -146,7 +191,7 @@ export function usePRForm({
         ],
         selectedRepoPath,
       );
-      if (result?.description) {
+      if (isDescriptionResult(result) && result.description) {
         setDescription(result.description);
       }
     } catch (e) {
@@ -195,14 +240,14 @@ export function usePRForm({
           selectedRepoPath || undefined,
         );
 
-        if (result.success) {
-          const successResults = result.results.filter((r: any) => r.url);
-          const failedResults = result.results.filter((r: any) => r.error);
-          const skippedResults = result.results.filter((r: any) => r.skipped);
+        if (isPRSubmissionResult(result) && result.success) {
+          const successResults = result.results.filter(isSuccessResult);
+          const failedResults = result.results.filter(isFailedResult);
+          const skippedResults = result.results.filter(isSkippedResult);
 
-          const allWarnings = result.results.flatMap(
-            (r: any) => r.warnings || [],
-          );
+          const allWarnings = result.results
+            .filter(isSuccessResult)
+            .flatMap((r) => r.warnings || []);
 
           if (successResults.length > 0) {
             toast.style = Toast.Style.Success;
@@ -210,12 +255,12 @@ export function usePRForm({
             toast.message = `Created ${successResults.length} PR(s)${allWarnings.length > 0 ? `\n\nWarnings:\n${allWarnings.join("\n")}` : ""}`;
 
             if (openPrInBrowser) {
-              successResults.forEach((r: any) => open(r.url));
+              successResults.forEach((r) => open(r.url));
             }
 
             toast.primaryAction = {
               title: "Open PRs",
-              onAction: () => successResults.forEach((r: any) => open(r.url)),
+              onAction: () => successResults.forEach((r) => open(r.url)),
             };
 
             // Reset form
@@ -232,17 +277,18 @@ export function usePRForm({
             toast.style = Toast.Style.Failure;
             toast.title = "Failed to create PR";
             toast.message = failedResults
-              .map((r: any) => `${r.target}: ${r.error}`)
+              .map((r) => `${r.target}: ${r.error}`)
               .join("\n");
           } else if (skippedResults.length > 0) {
             toast.style = Toast.Style.Success;
             toast.title = "Action Complete";
             toast.message = skippedResults
-              .map((r: any) => `${r.target}: ${r.reason}`)
+              .map((r) => `${r.target}: ${r.reason}`)
               .join("\n");
           }
         } else {
-          throw new Error(result.error || "Unknown error");
+          const errorMsg = isPRSubmissionResult(result) ? result.error : String(result);
+          throw new Error(errorMsg || "Unknown error");
         }
       } catch (error) {
         toast.style = Toast.Style.Failure;

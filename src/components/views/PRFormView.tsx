@@ -1,5 +1,5 @@
 import { Form, ActionPanel, Action, Icon } from "@raycast/api";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useGitData, GitData } from "../../hooks/useGitData";
 import { useRepos } from "../../hooks/useRepos";
 import { usePRPreview } from "../../hooks/usePRPreview";
@@ -67,6 +67,12 @@ export function PRFormView({
     }
     return [];
   }, [currentData, strategyType]);
+
+  // Reset recommendation and strategy when repo changes to avoid stale branch data
+  useEffect(() => {
+    setRecommendation(null);
+    setStrategyType("manual");
+  }, [repoPath]);
 
   const [recommendation, setRecommendation] =
     useState<StrategyRecommendation | null>(initialRecommendation);
@@ -161,11 +167,20 @@ export function PRFormView({
             // Auto-select the first stage for the new strategy
             let stages: Stage[] = [];
             if (newType === "release") {
-              stages = getReleaseStages(currentData.currentBranch, currentData.remoteBranches);
+              stages = getReleaseStages(
+                currentData.currentBranch,
+                currentData.remoteBranches,
+              );
             } else if (newType === "hotfix") {
               stages = [
-                ...getChildHotfixStages(currentData.currentBranch, currentData.remoteBranches),
-                ...getParentHotfixStages(currentData.currentBranch, currentData.remoteBranches),
+                ...getChildHotfixStages(
+                  currentData.currentBranch,
+                  currentData.remoteBranches,
+                ),
+                ...getParentHotfixStages(
+                  currentData.currentBranch,
+                  currentData.remoteBranches,
+                ),
               ];
             }
 
@@ -176,7 +191,11 @@ export function PRFormView({
         }}
       >
         <Form.Dropdown.Item value="manual" title="Manual" icon={Icon.Plus} />
-        <Form.Dropdown.Item value="release" title="Release" icon={Icon.Rocket} />
+        <Form.Dropdown.Item
+          value="release"
+          title="Release"
+          icon={Icon.Rocket}
+        />
         <Form.Dropdown.Item value="hotfix" title="Hotfix" icon={Icon.Hammer} />
       </Form.Dropdown>
 
@@ -190,7 +209,7 @@ export function PRFormView({
                 s.recommendation.name === recommendation?.name &&
                 s.recommendation.source === recommendation?.source &&
                 JSON.stringify(s.recommendation.targets) ===
-                JSON.stringify(recommendation?.targets),
+                  JSON.stringify(recommendation?.targets),
             )?.title || ""
           }
           onChange={(val) => {

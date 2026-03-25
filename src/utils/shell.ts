@@ -8,7 +8,7 @@ const execFileAsync = promisify(execFile);
 export async function runPythonScript(
   args: string[],
   cwd?: string,
-): Promise<any> {
+): Promise<unknown> {
   const scriptPath = path.join(environment.assetsPath, "pr_engine.py");
   const pythonExecutable = path.join(
     environment.assetsPath,
@@ -39,14 +39,15 @@ export async function runPythonScript(
       console.warn("Python stderr:", stderr);
     }
     return JSON.parse(stdout);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Python Execution Error:", error);
     // Attempt to parse JSON from stdout even if it failed (it might have printed error JSON)
-    if (error.stdout) {
+    if (typeof error === "object" && error !== null && "stdout" in error) {
+      const errWithStdout = error as { stdout?: string };
       try {
-        return JSON.parse(error.stdout);
+        return JSON.parse(errWithStdout.stdout || "");
       } catch (e) {
-        // ignore
+        console.warn("Failed to parse error stdout as JSON");
       }
     }
     throw error;

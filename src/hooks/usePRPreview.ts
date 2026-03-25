@@ -1,6 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
 import { runPythonScript } from "../utils/shell";
 
+interface PreviewResult {
+  title: string;
+  body: string;
+  suggestedReviewers?: string[];
+}
+
 interface UsePRPreviewProps {
   selectedRepoPath: string | null;
   sourceBranch: string;
@@ -8,13 +14,13 @@ interface UsePRPreviewProps {
   jiraDetails: string;
   titleExtension: string;
   description: string;
-  setPreview: (
-    preview: {
-      title: string;
-      body: string;
-      suggestedReviewers?: string[];
-    } | null,
-  ) => void;
+  setPreview: (preview: PreviewResult | null) => void;
+}
+
+function isPreviewResult(value: unknown): value is PreviewResult {
+  if (typeof value !== "object" || value === null) return false;
+  const obj = value as Record<string, unknown>;
+  return typeof obj.title === "string" && typeof obj.body === "string";
 }
 
 export function usePRPreview({
@@ -25,7 +31,10 @@ export function usePRPreview({
   titleExtension,
   description,
   setPreview,
-}: UsePRPreviewProps) {
+}: UsePRPreviewProps): {
+  isRefreshing: boolean;
+  updatePreview: () => Promise<void>;
+} {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const updatePreview = useCallback(async () => {
@@ -47,7 +56,11 @@ export function usePRPreview({
       if (description) args.push("--body", description);
 
       const result = await runPythonScript(args, selectedRepoPath);
-      setPreview(result);
+      if (isPreviewResult(result)) {
+        setPreview(result);
+      } else {
+        setPreview(null);
+      }
     } catch (e) {
       console.error("Preview failed:", e);
     } finally {

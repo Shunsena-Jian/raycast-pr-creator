@@ -1,3 +1,4 @@
+import logging
 import subprocess
 from .utils import run_cmd, print_colored
 
@@ -7,16 +8,15 @@ def is_git_repo() -> bool:
         run_cmd(["git", "rev-parse", "--is-inside-work-tree"], capture=True)
         return True
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        import sys
-        print(f"DEBUG: is_git_repo failed: {e}", file=sys.stderr)
+        logging.debug(f"is_git_repo failed: {e}")
         return False
 
-def fetch_latest_branches():
+def fetch_latest_branches() -> None:
     """Fetch latest branches from origin."""
     try:
         run_cmd(["git", "fetch", "--all", "--prune"], check=False, capture=True)
-    except Exception:
-        pass
+    except Exception as e:
+        logging.warning(f"Failed to fetch branches: {e}")
 
 def get_remote_branches() -> list[str]:
     """Get a list of remote branches, stripping 'origin/' prefix."""
@@ -32,7 +32,8 @@ def get_remote_branches() -> list[str]:
                 line = line[len("origin/"):]
             branches.append(line)
         return branches
-    except subprocess.CalledProcessError:
+    except subprocess.CalledProcessError as e:
+        logging.warning(f"Failed to get remote branches: {e}")
         return []
 
 def get_current_branch() -> str:
@@ -40,7 +41,8 @@ def get_current_branch() -> str:
     try:
         result = run_cmd(["git", "branch", "--show-current"], capture=True)
         return result.stdout.strip()
-    except subprocess.CalledProcessError:
+    except subprocess.CalledProcessError as e:
+        logging.warning(f"Failed to get current branch: {e}")
         return ""
 
 def get_commits_between(base: str, head: str) -> list[str]:
@@ -56,19 +58,22 @@ def get_commits_between(base: str, head: str) -> list[str]:
             try:
                 run_cmd(["git", "rev-parse", "--verify", base_ref], capture=True)
             except subprocess.CalledProcessError:
+                logging.warning(f"Failed to verify base ref: {base_ref}")
                 return []
 
         # --no-merges to skip merge commits
         try:
             run_cmd(["git", "rev-parse", "--verify", head], capture=True)
         except subprocess.CalledProcessError:
+            logging.warning(f"Failed to verify head ref: {head}")
             return []
 
         cmd = ["git", "log", f"{base_ref}..{head}", "--no-merges", "--pretty=format:%s"]
         result = run_cmd(cmd, capture=True)
         lines = [line.strip() for line in result.stdout.splitlines() if line.strip()]
         return lines
-    except subprocess.CalledProcessError:
+    except subprocess.CalledProcessError as e:
+        logging.warning(f"Failed to get commits between: {e}")
         return []
 
 def get_changed_files(base: str, head: str) -> list[str]:
@@ -79,12 +84,13 @@ def get_changed_files(base: str, head: str) -> list[str]:
             run_cmd(["git", "rev-parse", "--verify", base_ref], capture=True)
         except subprocess.CalledProcessError:
             base_ref = base
-            
+
         cmd = ["git", "diff", "--name-only", f"{base_ref}...{head}"]
         result = run_cmd(cmd, capture=True)
         lines = [line.strip() for line in result.stdout.splitlines() if line.strip()]
         return lines
-    except subprocess.CalledProcessError:
+    except subprocess.CalledProcessError as e:
+        logging.warning(f"Failed to get changed files: {e}")
         return []
 
 def get_current_user_email() -> str:
@@ -92,5 +98,6 @@ def get_current_user_email() -> str:
     try:
         result = run_cmd(["git", "config", "user.email"], capture=True)
         return result.stdout.strip()
-    except subprocess.CalledProcessError:
+    except subprocess.CalledProcessError as e:
+        logging.warning(f"Failed to get current user email: {e}")
         return ""

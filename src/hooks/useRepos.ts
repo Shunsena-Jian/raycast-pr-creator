@@ -13,7 +13,10 @@ export interface Repo {
   path: string;
 }
 
-export function useRepos() {
+export function useRepos(): {
+  repos: Repo[];
+  isLoading: boolean;
+} {
   const preferences = getPreferenceValues<Preferences>();
 
   const { data, isLoading } = useCachedPromise(

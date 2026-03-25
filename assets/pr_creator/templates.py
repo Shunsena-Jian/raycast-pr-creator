@@ -1,3 +1,5 @@
+"""PR description template for Pull Requests."""
+
 PR_TEMPLATE = """**JIRA Ticket/Release:**
 {tickets}
 

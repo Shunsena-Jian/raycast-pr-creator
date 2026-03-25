@@ -1,8 +1,10 @@
-import shutil
-import sys
 import json
+import logging
 import re
+import shutil
 import subprocess
+from typing import Optional
+
 from .utils import run_cmd, print_colored
 from .config import load_config, add_to_user_map
 
@@ -56,8 +58,8 @@ def resolve_handle(git_identity: str, interactive: bool = True) -> str:
         handle = result.stdout.strip()
         if handle:
             return handle
-    except Exception:
-        pass
+    except Exception as e:
+        logging.warning(f"Failed to resolve GitHub handle for {email}: {e}")
     
     if not interactive:
         return None
@@ -66,7 +68,15 @@ def resolve_handle(git_identity: str, interactive: bool = True) -> str:
     # Note: In Raycast mode, input() will fail or hang. We should avoid it.
     return None 
 
-def create_pr(source: str, target: str, title: str, body: str, reviewers: list[str] = None, skip_confirm: bool = False, draft: bool = False) -> dict:
+def create_pr(
+    source: str,
+    target: str,
+    title: str,
+    body: str,
+    reviewers: Optional[list[str]] = None,
+    skip_confirm: bool = False,
+    draft: bool = False,
+) -> dict:
     """
     Constructs and executes the gh pr create command.
     Returns a dict with 'url', 'error', and 'warnings'.
@@ -110,13 +120,14 @@ def get_contributors() -> list[str]:
     """Fetch list of contributors from GitHub API."""
     if shutil.which("gh") is None:
         return []
-        
+
     try:
         cmd = ["gh", "api", "repos/:owner/:repo/contributors", "--jq", ".[].login"]
         result = run_cmd(cmd, capture=True)
         contributors = [line.strip() for line in result.stdout.splitlines() if line.strip()]
         return contributors
-    except Exception:
+    except Exception as e:
+        logging.warning(f"Failed to get contributors: {e}")
         return []
 
 def get_current_username() -> str:
@@ -127,5 +138,6 @@ def get_current_username() -> str:
         cmd = ["gh", "api", "user", "--jq", ".login"]
         result = run_cmd(cmd, capture=True)
         return result.stdout.strip()
-    except Exception:
+    except Exception as e:
+        logging.warning(f"Failed to get current username: {e}")
         return ""
