@@ -107,8 +107,9 @@ export function usePRForm({
   );
 
   // --- Form States ---
+  // When recommendation is null (manual mode), use data.currentBranch as initial value
   const [sourceBranch, setSourceBranch] = useState(
-    recommendation?.source || "",
+    recommendation?.source || data?.currentBranch || "",
   );
   const [targetBranches, setTargetBranches] = useState<string[]>(
     recommendation?.targets || [],
@@ -287,7 +288,9 @@ export function usePRForm({
               .join("\n");
           }
         } else {
-          const errorMsg = isPRSubmissionResult(result) ? result.error : String(result);
+          const errorMsg = isPRSubmissionResult(result)
+            ? result.error
+            : String(result);
           throw new Error(errorMsg || "Unknown error");
         }
       } catch (error) {

@@ -1,5 +1,5 @@
 import { Form, ActionPanel, Action, Icon } from "@raycast/api";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useGitData, GitData } from "../../hooks/useGitData";
 import { useRepos } from "../../hooks/useRepos";
 import { usePRPreview } from "../../hooks/usePRPreview";
@@ -95,6 +95,12 @@ export function PRFormView({
     recommendation,
   });
 
+  // Keep a ref to the form so callbacks always have current form state
+  const formRef = useRef(form);
+  useEffect(() => {
+    formRef.current = form;
+  }, [form]);
+
   const { isRefreshing, updatePreview } = usePRPreview({
     selectedRepoPath: repoPath,
     sourceBranch: form.sourceBranch,
@@ -163,6 +169,10 @@ export function PRFormView({
 
           if (newType === "manual") {
             setRecommendation(null);
+            // Explicitly reset source branch to current branch when switching to manual
+            if (currentData) {
+              formRef.current.setSourceBranch(currentData.currentBranch);
+            }
           } else if (currentData) {
             // Auto-select the first stage for the new strategy
             let stages: Stage[] = [];
