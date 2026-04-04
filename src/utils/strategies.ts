@@ -5,6 +5,7 @@ export interface StrategyRecommendation {
 }
 
 export interface Stage {
+  id: string;
   title: string;
   recommendation: StrategyRecommendation;
 }
@@ -12,6 +13,14 @@ export interface Stage {
 export const STAGING_PATTERN = /release\/\d+\.\d+\.\d+$/;
 export const ALPHA_PATTERN = /release\/\d+\.\d+\.\d+-a$/;
 export const BETA_PATTERN = /release\/\d+\.\d+\.\d+-b$/;
+
+function buildStageId(recommendation: StrategyRecommendation): string {
+  return [
+    recommendation.name,
+    recommendation.source,
+    recommendation.targets.join(","),
+  ].join("|");
+}
 
 /**
  * Determines release stages based on naming conventions:
@@ -39,6 +48,11 @@ export function getReleaseStages(
   if (releaseBranches.length > 0) {
     const latestRB = releaseBranches[0];
     stages.push({
+      id: buildStageId({
+        name: "Release: Feature",
+        source: currentBranch,
+        targets: ["develop", latestRB],
+      }),
       title: `Feature -> Develop & ${latestRB}`,
       recommendation: {
         name: "Release: Feature",
@@ -48,6 +62,11 @@ export function getReleaseStages(
     });
   } else {
     stages.push({
+      id: buildStageId({
+        name: "Release: Feature",
+        source: currentBranch,
+        targets: ["develop"],
+      }),
       title: "Feature -> Develop (No release branch found)",
       recommendation: {
         name: "Release: Feature",
@@ -60,6 +79,11 @@ export function getReleaseStages(
   // 2. Staging -> Alpha
   releaseBranches.forEach((rb) => {
     stages.push({
+      id: buildStageId({
+        name: "Release: Staging->Alpha",
+        source: rb,
+        targets: [`${rb}-a`],
+      }),
       title: `${rb} -> ${rb}-a (Alpha)`,
       recommendation: {
         name: "Release: Staging->Alpha",
@@ -72,6 +96,11 @@ export function getReleaseStages(
   // 3. Alpha -> Beta
   alphaBranches.forEach((ab) => {
     stages.push({
+      id: buildStageId({
+        name: "Release: Alpha->Beta",
+        source: ab,
+        targets: [ab.replace("-a", "-b")],
+      }),
       title: `${ab} -> ${ab.replace("-a", "-b")} (Beta)`,
       recommendation: {
         name: "Release: Alpha->Beta",
@@ -90,6 +119,11 @@ export function getReleaseStages(
         : "main";
 
     stages.push({
+      id: buildStageId({
+        name: "Release: Beta->Live",
+        source: bb,
+        targets: [liveBranch],
+      }),
       title: `${bb} -> ${liveBranch} (Live)`,
       recommendation: {
         name: "Release: Beta->Live",
@@ -149,6 +183,11 @@ export function getChildHotfixStages(
   ) {
     const parent = currentBranch.split("-")[0];
     stages.push({
+      id: buildStageId({
+        name: "Hotfix: Current Child",
+        source: currentBranch,
+        targets: [parent],
+      }),
       title: `Current: ${currentBranch} -> ${parent}`,
       recommendation: {
         name: "Hotfix: Current Child",
@@ -165,6 +204,11 @@ export function getChildHotfixStages(
 
     const parent = ch.split("-")[0];
     stages.push({
+      id: buildStageId({
+        name: `Hotfix: Child (${ch})`,
+        source: ch,
+        targets: [parent],
+      }),
       title: `${ch} -> ${parent}`,
       recommendation: {
         name: `Hotfix: Child (${ch})`,
@@ -195,6 +239,11 @@ export function getParentHotfixStages(
   if (currentBranch.startsWith("hotfix/")) {
     const detectedParent = currentBranch.split("-")[0];
     stages.push({
+      id: buildStageId({
+        name: "Hotfix: Detected Parent->All",
+        source: detectedParent,
+        targets: getParentHotfixTargets(remoteBranches),
+      }),
       title: `Parent: ${detectedParent} -> All Branches (Propagate)`,
       recommendation: {
         name: "Hotfix: Detected Parent->All",
@@ -213,6 +262,11 @@ export function getParentHotfixStages(
     if (ph === detectedParent) return;
 
     stages.push({
+      id: buildStageId({
+        name: `Hotfix: Parent (${ph})`,
+        source: ph,
+        targets: getParentHotfixTargets(remoteBranches),
+      }),
       title: `${ph} -> All Branches (Propagate)`,
       recommendation: {
         name: `Hotfix: Parent (${ph})`,

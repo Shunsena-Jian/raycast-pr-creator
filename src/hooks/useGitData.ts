@@ -9,6 +9,7 @@ export interface GitData {
   suggestedTickets: string[];
   suggestedTitle: string;
   personalizedReviewers: string[];
+  defaultTargetBranch?: string;
   error?: string;
 }
 
@@ -29,7 +30,9 @@ function isGitData(value: unknown): value is GitData {
     Array.isArray(contributors) &&
     Array.isArray(suggestedTickets) &&
     typeof suggestedTitle === "string" &&
-    Array.isArray(personalizedReviewers)
+    Array.isArray(personalizedReviewers) &&
+    (obj.defaultTargetBranch === undefined ||
+      typeof obj.defaultTargetBranch === "string")
   );
 }
 

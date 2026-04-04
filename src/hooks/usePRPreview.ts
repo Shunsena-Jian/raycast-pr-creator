@@ -63,6 +63,7 @@ export function usePRPreview({
       }
     } catch (e) {
       console.error("Preview failed:", e);
+      setPreview(null);
     } finally {
       setIsRefreshing(false);
     }

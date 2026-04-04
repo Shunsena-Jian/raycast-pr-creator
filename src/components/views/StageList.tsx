@@ -35,9 +35,9 @@ export function StageList({ type, data, selectedRepoPath }: StageListProps) {
 
   return (
     <List navigationTitle={title}>
-      {stages.map((stage, index) => (
+      {stages.map((stage) => (
         <List.Item
-          key={index}
+          key={stage.id}
           title={stage.title}
           actions={
             <ActionPanel>

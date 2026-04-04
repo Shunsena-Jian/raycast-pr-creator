@@ -6,12 +6,12 @@ import subprocess
 from typing import Optional
 
 from .utils import run_cmd, print_colored
-from .config import load_config, add_to_user_map
+from .config import load_config
 
 def check_existing_pr(source_branch: str, target_branch: str) -> bool:
     """Check if an open PR already exists using 'gh'. Returns True if exists."""
     if shutil.which("gh") is None:
-        return False
+        raise FileNotFoundError("gh CLI not found")
 
     # Debug info to stderr
     print_colored(f"Checking for existing PRs: {source_branch} -> {target_branch}...", "cyan")
@@ -30,11 +30,13 @@ def check_existing_pr(source_branch: str, target_branch: str) -> bool:
             return True
         return False
 
+    except subprocess.CalledProcessError as e:
+        error_msg = e.stderr.strip() or e.stdout.strip() or f"Exit code {e.returncode}"
+        raise RuntimeError(f"Failed to check for existing PRs: {error_msg}") from e
     except Exception as e:
-        print_colored(f"Warning: Failed to check for existing PRs: {str(e)}", "yellow")
-        return False
+        raise RuntimeError(f"Failed to check for existing PRs: {str(e)}") from e
 
-def resolve_handle(git_identity: str, interactive: bool = True) -> str:
+def resolve_handle(git_identity: str, interactive: bool = True) -> Optional[str]:
     """Resolve 'Name <email>' to GitHub username via config or gh api."""
     email = None
     if "<" in git_identity and ">" in git_identity:
@@ -116,7 +118,7 @@ def create_pr(
     except Exception as e:
         return {"error": str(e), "warnings": warnings}
 
-def get_contributors() -> list[str]:
+def get_contributors(ignored_authors: Optional[list[str]] = None) -> list[str]:
     """Fetch list of contributors from GitHub API."""
     if shutil.which("gh") is None:
         return []
@@ -125,6 +127,13 @@ def get_contributors() -> list[str]:
         cmd = ["gh", "api", "repos/:owner/:repo/contributors", "--jq", ".[].login"]
         result = run_cmd(cmd, capture=True)
         contributors = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+        if ignored_authors:
+            ignored = [entry.lower() for entry in ignored_authors if entry]
+            contributors = [
+                contributor
+                for contributor in contributors
+                if not any(term in contributor.lower() for term in ignored)
+            ]
         return contributors
     except Exception as e:
         logging.warning(f"Failed to get contributors: {e}")

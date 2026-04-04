@@ -136,6 +136,19 @@ export function usePRForm({
 
   // --- Effects ---
 
+  useEffect(() => {
+    isDescriptionDirty.current = false;
+    setTargetBranches([]);
+    setReviewers([]);
+    setTargetSearchText("");
+    setReviewerSearchText("");
+    setTitleExtension("");
+    setDescription("");
+    setJiraDetails("");
+    setIsDraft(false);
+    setPreview(null);
+  }, [selectedRepoPath, setPreview]);
+
   // Reset description state when repository changes
   useEffect(() => {
     isDescriptionDirty.current = false;
@@ -153,17 +166,22 @@ export function usePRForm({
       setSourceBranch(data.currentBranch);
       // Default target branch logic
       if (targetBranches.length === 0 && data.remoteBranches?.length > 0) {
+        const configuredDefault = data.defaultTargetBranch
+          ? data.remoteBranches.find((b) => b === data.defaultTargetBranch)
+          : undefined;
         const defaultTarget =
+          configuredDefault ||
           data.remoteBranches.find(
             (b) => b === "main" || b === "master" || b === "develop",
-          ) || data.remoteBranches[0];
+          ) ||
+          data.remoteBranches[0];
         setTargetBranches([defaultTarget]);
       }
     }
 
     setJiraDetails((data.suggestedTickets || []).join("\n"));
     setTitleExtension("");
-  }, [data, recommendation]);
+  }, [data, recommendation, targetBranches]);
 
   // Fetch initial description when branches are set
   useEffect(() => {
@@ -183,13 +201,13 @@ export function usePRForm({
     if (!selectedRepoPath) return;
     try {
       const result = await runPythonScript(
-        [
-          "--get-description",
-          "--source",
-          sourceBranch,
-          "--target",
-          targetBranches[0],
-        ],
+        (() => {
+          const args = ["--get-description", "--source", sourceBranch];
+          targetBranches.forEach((target) => {
+            args.push("--target", target);
+          });
+          return args;
+        })(),
         selectedRepoPath,
       );
       if (isDescriptionResult(result) && result.description) {

@@ -14,7 +14,12 @@ def is_git_repo() -> bool:
 def fetch_latest_branches() -> None:
     """Fetch latest branches from origin."""
     try:
-        run_cmd(["git", "fetch", "--all", "--prune"], check=False, capture=True)
+        run_cmd(
+            ["git", "fetch", "--all", "--prune"],
+            check=False,
+            capture=True,
+            timeout=120,
+        )
     except Exception as e:
         logging.warning(f"Failed to fetch branches: {e}")
 

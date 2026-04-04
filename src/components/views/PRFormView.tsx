@@ -1,4 +1,4 @@
-import { Form, ActionPanel, Action, Icon } from "@raycast/api";
+import { Form, ActionPanel, Action, Detail, Icon } from "@raycast/api";
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useGitData, GitData } from "../../hooks/useGitData";
 import { useRepos } from "../../hooks/useRepos";
@@ -28,9 +28,11 @@ export function PRFormView({
 
   // Only fetch if the user changes the repo from the initial one
   const shouldFetch = repoPath !== initialRepoPath;
-  const { data: newData, isLoading } = useGitData(
-    shouldFetch ? repoPath : undefined,
-  );
+  const {
+    data: newData,
+    isLoading,
+    error: fetchError,
+  } = useGitData(shouldFetch ? repoPath : undefined);
 
   // If we are fetching new data, wait for it. Otherwise use initialData.
   const currentData = shouldFetch ? newData : initialData;
@@ -112,7 +114,23 @@ export function PRFormView({
   });
 
   // If we're fetching new data (shouldFetch) and it's not ready yet, show loading
-  const showLoading = shouldFetch && isLoading;
+  const showLoading = shouldFetch && (isLoading || !newData);
+
+  if (shouldFetch && fetchError) {
+    return (
+      <Detail
+        markdown={`# Failed to load repository data\n\n${fetchError}`}
+        actions={
+          <ActionPanel>
+            <Action
+              title="Back to Previous Repo"
+              onAction={() => setRepoPath(initialRepoPath)}
+            />
+          </ActionPanel>
+        }
+      />
+    );
+  }
 
   // We can render the form but it might be empty if data is null.
   // Let's ensure we default gracefully if data is missing during a fetch.
@@ -127,7 +145,18 @@ export function PRFormView({
     contributors: [],
     suggestedTickets: [],
     suggestedTitle: "",
+    personalizedReviewers: [],
   };
+
+  const selectedStageId =
+    recommendation &&
+    allStages.find(
+      (stage) =>
+        stage.recommendation.name === recommendation.name &&
+        stage.recommendation.source === recommendation.source &&
+        stage.recommendation.targets.join(",") ===
+          recommendation.targets.join(","),
+    )?.id;
 
   return (
     <Form
@@ -213,28 +242,14 @@ export function PRFormView({
         <Form.Dropdown
           id="stage"
           title="Stage"
-          value={
-            allStages.find(
-              (s) =>
-                s.recommendation.name === recommendation?.name &&
-                s.recommendation.source === recommendation?.source &&
-                JSON.stringify(s.recommendation.targets) ===
-                  JSON.stringify(recommendation?.targets),
-            )?.title || ""
-          }
+          value={selectedStageId || ""}
           onChange={(val) => {
-            const stage = allStages.find(
-              (s: Stage) => s.recommendation.name === val,
-            );
+            const stage = allStages.find((s: Stage) => s.id === val);
             if (stage) setRecommendation(stage.recommendation);
           }}
         >
           {allStages.map((s: Stage) => (
-            <Form.Dropdown.Item
-              key={s.recommendation.name}
-              value={s.recommendation.name}
-              title={s.title}
-            />
+            <Form.Dropdown.Item key={s.id} value={s.id} title={s.title} />
           ))}
           {allStages.length === 0 && (
             <Form.Dropdown.Item value="" title="No stages available" />

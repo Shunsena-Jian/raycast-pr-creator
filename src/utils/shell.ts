@@ -28,6 +28,7 @@ export async function runPythonScript(
       [scriptPath, ...finalArgs],
       {
         cwd,
+        timeout: 120000,
         env: {
           ...process.env,
           PATH: `/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${process.env.PATH}`,

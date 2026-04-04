@@ -1,112 +1,165 @@
 import json
 import logging
-import os
-import sys
 from pathlib import Path
 from typing import Any, Dict
 
 CONFIG_FILENAME = ".pr_creator_config.json"
 
+
+def _normalize_string_list(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, str)]
+
+
+def _normalize_string_map(value: object) -> dict[str, str]:
+    if not isinstance(value, dict):
+        return {}
+
+    normalized: dict[str, str] = {}
+    for key, item in value.items():
+        if isinstance(key, str) and isinstance(item, str):
+            normalized[key] = item
+    return normalized
+
+
+def _merge_config(base: Dict[str, Any], user_config: object) -> Dict[str, Any]:
+    if not isinstance(user_config, dict):
+        logging.warning("Config file must contain a JSON object. Using defaults.")
+        return base
+
+    merged = dict(base)
+    default_target_branch = user_config.get("default_target_branch")
+    jira_base_url = user_config.get("jira_base_url")
+
+    merged["default_target_branch"] = (
+        default_target_branch
+        if isinstance(default_target_branch, str) and default_target_branch
+        else base["default_target_branch"]
+    )
+    merged["jira_project_keys"] = _normalize_string_list(
+        user_config.get("jira_project_keys")
+    )
+    merged["reviewer_groups"] = (
+        user_config.get("reviewer_groups")
+        if isinstance(user_config.get("reviewer_groups"), dict)
+        else {}
+    )
+    merged["github_user_map"] = _normalize_string_map(
+        user_config.get("github_user_map")
+    )
+    merged["ignored_authors"] = _normalize_string_list(
+        user_config.get("ignored_authors")
+    )
+    merged["jira_base_url"] = (
+        jira_base_url if isinstance(jira_base_url, str) and jira_base_url else base["jira_base_url"]
+    )
+    merged["personalized_reviewers"] = _normalize_string_list(
+        user_config.get("personalized_reviewers")
+    )
+    return merged
+
+
 def load_config() -> Dict[str, Any]:
     """
     Load configuration from:
-    1. Check current directory
-    2. Check user home directory
-    3. Return defaults if nothing found
+    1. Current directory
+    2. Home directory
+    3. Defaults if nothing is found
     """
-    defaults = {
+    defaults: Dict[str, Any] = {
         "default_target_branch": "main",
         "jira_project_keys": [],
         "reviewer_groups": {},
         "github_user_map": {},
         "ignored_authors": [],
         "jira_base_url": "https://qualitytrade.atlassian.net/browse/",
-        "personalized_reviewers": []
+        "personalized_reviewers": [],
     }
 
-    # Search paths: Current dir, Home dir
-    search_paths = [
-        Path.cwd() / CONFIG_FILENAME,
-        Path.home() / CONFIG_FILENAME
-    ]
+    search_paths = [Path.cwd() / CONFIG_FILENAME, Path.home() / CONFIG_FILENAME]
 
     for path in search_paths:
-        if path.exists():
-            try:
-                with open(path, "r") as f:
-                    user_config = json.load(f)
-                    # Use update to merge, but ensure defaults are respected
-                    for key, value in user_config.items():
-                        defaults[key] = value
-                    return defaults
-            except json.JSONDecodeError:
-                logging.warning(f"Failed to parse config file at {path}. Using defaults.")
-    
+        if not path.exists():
+            continue
+
+        try:
+            with open(path, "r", encoding="utf-8") as file_handle:
+                user_config = json.load(file_handle)
+                return _merge_config(defaults, user_config)
+        except json.JSONDecodeError:
+            logging.warning(f"Failed to parse config file at {path}. Using defaults.")
+        except OSError as exc:
+            logging.warning(f"Failed to read config file at {path}: {exc}")
+
     return defaults
+
+
+def _safe_write_config(path: Path, payload: Dict[str, Any]) -> None:
+    if path.is_symlink():
+        logging.warning(f"Refusing to write config to symlinked path: {path}")
+        return
+
+    try:
+        with open(path, "w", encoding="utf-8") as file_handle:
+            json.dump(payload, file_handle, indent=4)
+        logging.info(f"Saved configuration to {path}")
+    except OSError as exc:
+        logging.warning(f"Failed to save config: {exc}")
+
 
 def save_config(config_dict: Dict[str, Any]) -> None:
     """
     Saves the configuration to .pr_creator_config.json in the current directory.
-
-    Args:
-        config_dict: Dictionary containing configuration values to save.
     """
     target_path = Path.cwd() / CONFIG_FILENAME
-
-    # Load existing to merge if necessary, or just overwrite if it's meant to be full
     current_config: Dict[str, Any] = {}
+
     if target_path.exists():
         try:
-            with open(target_path, "r") as f:
-                current_config = json.load(f)
+            with open(target_path, "r", encoding="utf-8") as file_handle:
+                current_config = json.load(file_handle)
         except json.JSONDecodeError:
-            logging.warning(f"Failed to parse existing config at {target_path}. Starting fresh.")
+            logging.warning(
+                f"Failed to parse existing config at {target_path}. Starting fresh."
+            )
+        except OSError as exc:
+            logging.warning(f"Failed to read existing config at {target_path}: {exc}")
+
+    if not isinstance(current_config, dict):
+        current_config = {}
 
     current_config.update(config_dict)
+    _safe_write_config(target_path, current_config)
 
-    try:
-        with open(target_path, "w") as f:
-            json.dump(current_config, f, indent=4)
-        logging.info(f"Saved configuration to {target_path}")
-    except OSError as e:
-        logging.warning(f"Failed to save config: {e}")
 
 def add_to_user_map(email: str, handle: str) -> None:
     """
     Updates the github_user_map in the config file.
-
-    Prioritizes updating local config if it exists, otherwise home config.
-    Creates home config if neither exists.
-
-    Args:
-        email: The git email address to map.
-        handle: The GitHub username to map to.
     """
     local_config = Path.cwd() / CONFIG_FILENAME
     home_config = Path.home() / CONFIG_FILENAME
 
-    target_path = home_config
-    if local_config.exists():
-        target_path = local_config
-    elif home_config.exists():
-        target_path = home_config
+    target_path = local_config if local_config.exists() else home_config
+    if target_path.is_symlink():
+        logging.warning(f"Refusing to write config to symlinked path: {target_path}")
+        return
 
     current_config: Dict[str, Any] = {}
     if target_path.exists():
         try:
-            with open(target_path, "r") as f:
-                current_config = json.load(f)
+            with open(target_path, "r", encoding="utf-8") as file_handle:
+                current_config = json.load(file_handle)
         except json.JSONDecodeError:
             logging.warning(f"Failed to parse config at {target_path}. Starting fresh.")
+        except OSError as exc:
+            logging.warning(f"Failed to read config at {target_path}: {exc}")
 
-    if "github_user_map" not in current_config:
-        current_config["github_user_map"] = {}
+    if not isinstance(current_config, dict):
+        current_config = {}
 
-    current_config["github_user_map"][email] = handle
+    github_user_map = _normalize_string_map(current_config.get("github_user_map"))
+    github_user_map[email] = handle
+    current_config["github_user_map"] = github_user_map
 
-    try:
-        with open(target_path, "w") as f:
-            json.dump(current_config, f, indent=4)
-        logging.info(f"Saved mapping for {email} to {target_path}")
-    except OSError as e:
-        logging.warning(f"Failed to save config: {e}")
+    _safe_write_config(target_path, current_config)

@@ -23,9 +23,20 @@ def print_colored(text: str, color: str = "green") -> None:
     prefix = colors.get(color, "")
     print(f"{prefix}{text}{colors['reset']}", file=sys.stderr)
 
-def run_cmd(cmd: List[str], check: bool = True, capture: bool = False) -> subprocess.CompletedProcess:
+def run_cmd(
+    cmd: List[str],
+    check: bool = True,
+    capture: bool = False,
+    timeout: Optional[int] = 60,
+) -> subprocess.CompletedProcess:
     """Run a subprocess command safely."""
-    return subprocess.run(cmd, check=check, capture_output=capture, text=True)
+    return subprocess.run(
+        cmd,
+        check=check,
+        capture_output=capture,
+        text=True,
+        timeout=timeout,
+    )
 
 def extract_jira_id(input_str: str) -> Optional[str]:
     """
