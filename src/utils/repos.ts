@@ -15,6 +15,11 @@ export interface Repo {
   source: RepoSource;
 }
 
+type RepoChangeListener = () => void;
+
+let recentRepoPathsCache: string[] | null = null;
+const repoChangeListeners = new Set<RepoChangeListener>();
+
 function parseRepoPaths(value: string | undefined): string[] {
   if (!value) {
     return [];
@@ -34,6 +39,20 @@ function parseRepoPaths(value: string | undefined): string[] {
 
 function serializeRepoPaths(repoPaths: string[]): string {
   return JSON.stringify(repoPaths);
+}
+
+function notifyRepoChangeListeners(): void {
+  for (const listener of repoChangeListeners) {
+    listener();
+  }
+}
+
+export function subscribeRepoChanges(listener: RepoChangeListener): () => void {
+  repoChangeListeners.add(listener);
+
+  return () => {
+    repoChangeListeners.delete(listener);
+  };
 }
 
 function expandHomeDirectory(value: string): string {
@@ -147,6 +166,18 @@ export async function getRepos(
   return [...recentRepos, ...projectRepos];
 }
 
+export async function readRecentRepoPaths(): Promise<string[]> {
+  if (recentRepoPathsCache) {
+    return recentRepoPathsCache;
+  }
+
+  const currentValue = await LocalStorage.getItem<string>(
+    RECENT_REPO_PATHS_STORAGE_KEY,
+  );
+  recentRepoPathsCache = parseRepoPaths(currentValue);
+  return recentRepoPathsCache;
+}
+
 export async function rememberRepoPath(repoPath: string): Promise<boolean> {
   const normalizedPath = normalizeRepoPath(repoPath);
 
@@ -154,10 +185,7 @@ export async function rememberRepoPath(repoPath: string): Promise<boolean> {
     return false;
   }
 
-  const currentValue = await LocalStorage.getItem<string>(
-    RECENT_REPO_PATHS_STORAGE_KEY,
-  );
-  const currentRecentRepoPaths = parseRepoPaths(currentValue);
+  const currentRecentRepoPaths = await readRecentRepoPaths();
 
   const nextRecentRepoPaths: string[] = [normalizedPath];
 
@@ -172,10 +200,12 @@ export async function rememberRepoPath(repoPath: string): Promise<boolean> {
     }
   }
 
+  recentRepoPathsCache = nextRecentRepoPaths;
   await LocalStorage.setItem(SELECTED_REPO_STORAGE_KEY, normalizedPath);
   await LocalStorage.setItem(
     RECENT_REPO_PATHS_STORAGE_KEY,
     serializeRepoPaths(nextRecentRepoPaths),
   );
+  notifyRepoChangeListeners();
   return true;
 }
