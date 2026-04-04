@@ -4,6 +4,7 @@ import { useGitData, GitData } from "../../hooks/useGitData";
 import { useRepos } from "../../hooks/useRepos";
 import { usePRPreview } from "../../hooks/usePRPreview";
 import { usePRForm } from "../../hooks/usePRForm";
+import { rememberRepoPath } from "../../utils/repos";
 import {
   StrategyRecommendation,
   getReleaseStages,
@@ -75,6 +76,14 @@ export function PRFormView({
     setRecommendation(null);
     setStrategyType("manual");
   }, [repoPath]);
+
+  useEffect(() => {
+    if (repoPath === initialRepoPath) {
+      return;
+    }
+
+    void rememberRepoPath(repoPath);
+  }, [initialRepoPath, repoPath]);
 
   const [recommendation, setRecommendation] =
     useState<StrategyRecommendation | null>(initialRecommendation);

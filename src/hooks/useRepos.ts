@@ -1,16 +1,9 @@
 import { getPreferenceValues } from "@raycast/api";
-import { useCachedPromise } from "@raycast/utils";
-import fs from "fs/promises";
-import { existsSync } from "fs";
-import path from "path";
+import { useCachedPromise, useLocalStorage } from "@raycast/utils";
+import { getRepos, RECENT_REPO_PATHS_STORAGE_KEY, Repo } from "../utils/repos";
 
 export interface Preferences {
   projectsDirectory: string;
-}
-
-export interface Repo {
-  name: string;
-  path: string;
 }
 
 export function useRepos(): {
@@ -18,38 +11,35 @@ export function useRepos(): {
   isLoading: boolean;
 } {
   const preferences = getPreferenceValues<Preferences>();
+  const { value: recentRepoPathsValue } = useLocalStorage<string>(
+    RECENT_REPO_PATHS_STORAGE_KEY,
+    "[]",
+  );
+  const recentRepoPaths = (() => {
+    if (!recentRepoPathsValue) {
+      return [];
+    }
 
-  const { data, isLoading } = useCachedPromise(
-    async (projectsDir: string): Promise<Repo[]> => {
-      const baseDir = projectsDir.replace("~", process.env.HOME || "");
-
-      try {
-        if (!existsSync(baseDir)) return [];
-
-        const files = await fs.readdir(baseDir);
-        const repos: Repo[] = [];
-
-        for (const file of files) {
-          const fullPath = path.join(baseDir, file);
-          try {
-            const stat = await fs.stat(fullPath);
-            if (stat.isDirectory() && existsSync(path.join(fullPath, ".git"))) {
-              repos.push({
-                name: file,
-                path: fullPath,
-              });
-            }
-          } catch (e) {
-            // Ignore individual stat errors
-          }
-        }
-        return repos;
-      } catch (e) {
-        console.error("Failed to read repositories:", e);
+    try {
+      const parsed: unknown = JSON.parse(recentRepoPathsValue);
+      if (!Array.isArray(parsed)) {
         return [];
       }
+
+      return parsed.filter((item): item is string => typeof item === "string");
+    } catch {
+      return [];
+    }
+  })();
+
+  const { data, isLoading } = useCachedPromise(
+    async (projectsDir: string, recentPaths: string[]): Promise<Repo[]> => {
+      return await getRepos(projectsDir, recentPaths);
     },
-    [preferences.projectsDirectory],
+    [preferences.projectsDirectory, recentRepoPaths],
+    {
+      keepPreviousData: true,
+    },
   );
 
   return { repos: data || [], isLoading };

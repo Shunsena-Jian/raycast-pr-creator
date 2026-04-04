@@ -2,20 +2,36 @@ import { Detail, useNavigation } from "@raycast/api";
 import { useGitData } from "../hooks/useGitData";
 import { SelectRepo } from "./SelectRepo";
 import { ReviewerEditorView } from "./views/ReviewerEditorView";
+import { AddRepositoryView } from "./views/AddRepositoryView";
 
 export function ReviewerManagementView({
   onSelectRepo,
 }: {
-  onSelectRepo: (repoPath: string) => Promise<void>;
+  onSelectRepo: (repoPath: string) => Promise<boolean>;
 }) {
   const { push } = useNavigation();
 
-  const handleSelect = async (repoPath: string) => {
-    await onSelectRepo(repoPath);
-    push(<ReviewerManagementLoader selectedRepoPath={repoPath} />);
+  const handleSelect = async (repoPath: string): Promise<boolean> => {
+    const success = await onSelectRepo(repoPath);
+    if (success) {
+      push(<ReviewerManagementLoader selectedRepoPath={repoPath} />);
+    }
+    return success;
   };
 
-  return <SelectRepo onSelect={handleSelect} />;
+  return (
+    <SelectRepo
+      onSelect={handleSelect}
+      addRepositoryTarget={
+        <AddRepositoryView
+          onValidateRepository={onSelectRepo}
+          onConfirmRepository={async (repoPath) => {
+            push(<ReviewerManagementLoader selectedRepoPath={repoPath} />);
+          }}
+        />
+      }
+    />
+  );
 }
 
 function ReviewerManagementLoader({

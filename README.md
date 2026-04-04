@@ -12,6 +12,7 @@ A powerful Raycast extension designed to streamline the Pull Request lifecycle. 
 - **Personalized Reviewers:** Create a repository-specific list of preferred reviewers to filter out inactive members.
 - **Manage Reviewers Command:** A dedicated command to update your personalized reviewers list at any time.
 - **Real-time Preview:** Live preview of PR title and body as you configure the form.
+- **Flexible Repo Selection:** Open repositories from your Projects Directory, recent repos, or add any local git repo manually.
 
 ## 🚀 Installation
 
@@ -43,7 +44,7 @@ Run `npm run dev` to start the extension in development mode and install it into
 
 ## ⚙️ Configuration
 
-Upon first launch, select your **Projects Directory** in the extension preferences. This should be the parent folder containing your local git repositories.
+Upon first launch, select your **Projects Directory** in the extension preferences. This is still the default repo source, but you can also add and reuse repositories from outside that folder directly in the picker.
 
 ### Advanced Customization
 Create a `.pr_creator_config.json` in your **Home folder** (`~`) to customize the default behavior:

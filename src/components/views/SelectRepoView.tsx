@@ -4,6 +4,7 @@ import { StrategyList } from "./StrategyList";
 import { SelectRepo } from "../SelectRepo";
 import { ReviewerSelectionView } from "./ReviewerSelectionView";
 import { useState } from "react";
+import { AddRepositoryView } from "./AddRepositoryView";
 
 export function StrategyLoader({
   selectedRepoPath,
@@ -54,14 +55,29 @@ ${error || data?.error || "Failed to load git data."}`}
 export function SelectRepoView({
   onSelect,
 }: {
-  onSelect: (repoPath: string) => Promise<void>;
+  onSelect: (repoPath: string) => Promise<boolean>;
 }) {
   const { push } = useNavigation();
 
-  const handleSelect = async (repoPath: string) => {
-    await onSelect(repoPath);
-    push(<StrategyLoader selectedRepoPath={repoPath} />);
+  const handleSelect = async (repoPath: string): Promise<boolean> => {
+    const success = await onSelect(repoPath);
+    if (success) {
+      push(<StrategyLoader selectedRepoPath={repoPath} />);
+    }
+    return success;
   };
 
-  return <SelectRepo onSelect={handleSelect} />;
+  return (
+    <SelectRepo
+      onSelect={handleSelect}
+      addRepositoryTarget={
+        <AddRepositoryView
+          onValidateRepository={onSelect}
+          onConfirmRepository={async (repoPath) => {
+            push(<StrategyLoader selectedRepoPath={repoPath} />);
+          }}
+        />
+      }
+    />
+  );
 }
