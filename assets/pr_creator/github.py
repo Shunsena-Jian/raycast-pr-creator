@@ -4,9 +4,11 @@ import re
 import shutil
 import subprocess
 from typing import Optional
+from urllib.parse import quote
 
 from .utils import run_cmd, print_colored
 from .config import load_config
+
 
 def check_existing_pr(source_branch: str, target_branch: str) -> bool:
     """Check if an open PR already exists using 'gh'. Returns True if exists."""
@@ -14,17 +16,31 @@ def check_existing_pr(source_branch: str, target_branch: str) -> bool:
         raise FileNotFoundError("gh CLI not found")
 
     # Debug info to stderr
-    print_colored(f"Checking for existing PRs: {source_branch} -> {target_branch}...", "cyan")
-    
+    print_colored(
+        f"Checking for existing PRs: {source_branch} -> {target_branch}...", "cyan"
+    )
+
     head = source_branch
     base = target_branch
-    
+
     try:
         # We specify the current repo explicitly if possible, or just let gh handle it
-        cmd = ["gh", "pr", "list", "--head", head, "--base", base, "--state", "open", "--json", "url,title"]
+        cmd = [
+            "gh",
+            "pr",
+            "list",
+            "--head",
+            head,
+            "--base",
+            base,
+            "--state",
+            "open",
+            "--json",
+            "url,title",
+        ]
         result = run_cmd(cmd, capture=True)
         prs = json.loads(result.stdout)
-        
+
         if prs:
             print_colored(f"[!] A PR already exists for {head} -> {base}", "yellow")
             return True
@@ -36,39 +52,48 @@ def check_existing_pr(source_branch: str, target_branch: str) -> bool:
     except Exception as e:
         raise RuntimeError(f"Failed to check for existing PRs: {str(e)}") from e
 
+
 def resolve_handle(git_identity: str, interactive: bool = True) -> Optional[str]:
     """Resolve 'Name <email>' to GitHub username via config or gh api."""
     email = None
     if "<" in git_identity and ">" in git_identity:
-        m = re.search(r'<([^>]+)>', git_identity)
+        m = re.search(r"<([^>]+)>", git_identity)
         if m:
             email = m.group(1)
     elif "@" in git_identity:
         email = git_identity.strip()
-            
+
     if not email:
         return git_identity
-    
+
     config = load_config()
     user_map = config.get("github_user_map", {})
     if email in user_map:
         return user_map[email]
-        
+
     try:
-        cmd = ["gh", "api", f"search/users?q={email}", "--jq", ".items[0].login"]
+        encoded_email = quote(email, safe="")
+        cmd = [
+            "gh",
+            "api",
+            f"search/users?q={encoded_email}",
+            "--jq",
+            ".items[0].login",
+        ]
         result = run_cmd(cmd, capture=True, check=False)
         handle = result.stdout.strip()
         if handle:
             return handle
     except Exception as e:
         logging.warning(f"Failed to resolve GitHub handle for {email}: {e}")
-    
+
     if not interactive:
         return None
 
     print_colored(f"Could not resolve GitHub username for: {email}", "yellow")
     # Note: In Raycast mode, input() will fail or hang. We should avoid it.
-    return None 
+    return None
+
 
 def create_pr(
     source: str,
@@ -87,19 +112,25 @@ def create_pr(
         return {"error": "gh CLI not found"}
 
     cmd = [
-        "gh", "pr", "create",
-        "--base", target,
-        "--head", source,
-        "--title", title,
-        "--body", body
+        "gh",
+        "pr",
+        "create",
+        "--base",
+        target,
+        "--head",
+        source,
+        "--title",
+        title,
+        "--body",
+        body,
     ]
-    
+
     if draft:
         cmd.append("--draft")
-    
+
     warnings = []
     if reviewers:
-         for r in reviewers:
+        for r in reviewers:
             handle = resolve_handle(r, interactive=not skip_confirm)
             if handle:
                 cmd.extend(["--reviewer", handle])
@@ -118,6 +149,7 @@ def create_pr(
     except Exception as e:
         return {"error": str(e), "warnings": warnings}
 
+
 def get_contributors(ignored_authors: Optional[list[str]] = None) -> list[str]:
     """Fetch list of contributors from GitHub API."""
     if shutil.which("gh") is None:
@@ -126,7 +158,9 @@ def get_contributors(ignored_authors: Optional[list[str]] = None) -> list[str]:
     try:
         cmd = ["gh", "api", "repos/:owner/:repo/contributors", "--jq", ".[].login"]
         result = run_cmd(cmd, capture=True)
-        contributors = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+        contributors = [
+            line.strip() for line in result.stdout.splitlines() if line.strip()
+        ]
         if ignored_authors:
             ignored = [entry.lower() for entry in ignored_authors if entry]
             contributors = [
@@ -138,6 +172,7 @@ def get_contributors(ignored_authors: Optional[list[str]] = None) -> list[str]:
     except Exception as e:
         logging.warning(f"Failed to get contributors: {e}")
         return []
+
 
 def get_current_username() -> str:
     """Get the currently authenticated GitHub username."""

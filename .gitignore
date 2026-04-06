@@ -18,6 +18,7 @@ htmlcov/
 # Raycast
 .raycast/
 .pr_creator_config.json
+.pr_creator_config.json
 
 # OS
 .DS_Store

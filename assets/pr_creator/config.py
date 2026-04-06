@@ -52,7 +52,9 @@ def _merge_config(base: Dict[str, Any], user_config: object) -> Dict[str, Any]:
         user_config.get("ignored_authors")
     )
     merged["jira_base_url"] = (
-        jira_base_url if isinstance(jira_base_url, str) and jira_base_url else base["jira_base_url"]
+        jira_base_url
+        if isinstance(jira_base_url, str) and jira_base_url
+        else base["jira_base_url"]
     )
     merged["personalized_reviewers"] = _normalize_string_list(
         user_config.get("personalized_reviewers")
@@ -62,10 +64,9 @@ def _merge_config(base: Dict[str, Any], user_config: object) -> Dict[str, Any]:
 
 def load_config() -> Dict[str, Any]:
     """
-    Load configuration from:
-    1. Current directory
-    2. Home directory
-    3. Defaults if nothing is found
+    Load configuration from home directory only for security.
+    Config files in project directories (cwd) are not loaded to prevent
+    injection attacks via malicious config files in repositories.
     """
     defaults: Dict[str, Any] = {
         "default_target_branch": "main",
@@ -77,20 +78,19 @@ def load_config() -> Dict[str, Any]:
         "personalized_reviewers": [],
     }
 
-    search_paths = [Path.cwd() / CONFIG_FILENAME, Path.home() / CONFIG_FILENAME]
+    home_config_path = Path.home() / CONFIG_FILENAME
 
-    for path in search_paths:
-        if not path.exists():
-            continue
-
+    if home_config_path.exists():
         try:
-            with open(path, "r", encoding="utf-8") as file_handle:
+            with open(home_config_path, "r", encoding="utf-8") as file_handle:
                 user_config = json.load(file_handle)
                 return _merge_config(defaults, user_config)
         except json.JSONDecodeError:
-            logging.warning(f"Failed to parse config file at {path}. Using defaults.")
+            logging.warning(
+                f"Failed to parse config file at {home_config_path}. Using defaults."
+            )
         except OSError as exc:
-            logging.warning(f"Failed to read config file at {path}: {exc}")
+            logging.warning(f"Failed to read config file at {home_config_path}: {exc}")
 
     return defaults
 
@@ -110,9 +110,9 @@ def _safe_write_config(path: Path, payload: Dict[str, Any]) -> None:
 
 def save_config(config_dict: Dict[str, Any]) -> None:
     """
-    Saves the configuration to .pr_creator_config.json in the current directory.
+    Saves the configuration to .pr_creator_config.json in the home directory only.
     """
-    target_path = Path.cwd() / CONFIG_FILENAME
+    target_path = Path.home() / CONFIG_FILENAME
     current_config: Dict[str, Any] = {}
 
     if target_path.exists():
@@ -135,12 +135,9 @@ def save_config(config_dict: Dict[str, Any]) -> None:
 
 def add_to_user_map(email: str, handle: str) -> None:
     """
-    Updates the github_user_map in the config file.
+    Updates the github_user_map in the config file in the home directory.
     """
-    local_config = Path.cwd() / CONFIG_FILENAME
-    home_config = Path.home() / CONFIG_FILENAME
-
-    target_path = local_config if local_config.exists() else home_config
+    target_path = Path.home() / CONFIG_FILENAME
     if target_path.is_symlink():
         logging.warning(f"Refusing to write config to symlinked path: {target_path}")
         return
